@@ -1,0 +1,206 @@
+.page {
+  display: grid;
+  gap: 18px;
+  margin-top: 20px;
+}
+
+.header,
+.panel {
+  padding: 20px 22px;
+  border: 1px solid #dbe3ee;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.header h2,
+.panelHeader h3 {
+  margin: 0;
+  color: #1a2b4a;
+}
+
+.header p {
+  margin: 8px 0 0;
+  color: #6f7d90;
+}
+
+.backButton,
+.primaryButton,
+.secondaryButton,
+.linkButton,
+.linkDanger {
+  border: 0;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.backButton,
+.secondaryButton {
+  padding: 10px 14px;
+  background: #eef3f8;
+  color: #1a2b4a;
+}
+
+.backButton {
+  margin-bottom: 14px;
+}
+
+.primaryButton {
+  min-height: 42px;
+  padding: 10px 14px;
+  background: #1a2b4a;
+  color: #ffffff;
+}
+
+.linkButton,
+.linkDanger {
+  padding: 0;
+  background: transparent;
+}
+
+.linkButton {
+  color: #1a2b4a;
+}
+
+.linkDanger {
+  color: #d03a46;
+}
+
+.message {
+  padding: 12px 14px;
+  border-radius: 10px;
+}
+
+.success {
+  background: #edf8ef;
+  color: #257947;
+}
+
+.error {
+  background: #fdecef;
+  color: #a12f39;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1.7fr 1fr;
+  gap: 18px;
+}
+
+.panelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.panelHeader span {
+  color: #6f7d90;
+  font-size: 0.88rem;
+}
+
+.searchRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.input,
+.select {
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid #cfd8e3;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #1a2b4a;
+}
+
+.input,
+.select {
+  min-width: 220px;
+}
+
+.input:focus,
+.select:focus {
+  outline: none;
+  border-color: #1a2b4a;
+  box-shadow: 0 0 0 3px rgba(26, 43, 74, 0.12);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #e7edf5;
+  text-align: left;
+}
+
+.table th {
+  color: #4e607d;
+  font-size: 0.84rem;
+  text-transform: uppercase;
+}
+
+.emptyCell {
+  text-align: center;
+  color: #7a8799;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+}
+
+.form {
+  display: grid;
+  gap: 14px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+  color: #30405f;
+  font-weight: 600;
+}
+
+@media (max-width: 1080px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .header,
+  .panelHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .searchRow {
+    flex-direction: column;
+  }
+
+  .input,
+  .select,
+  .primaryButton,
+  .secondaryButton {
+    width: 100%;
+  }
+}

@@ -1,0 +1,166 @@
+.loginPage {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background:
+    radial-gradient(circle at top left, rgba(230, 87, 72, 0.2), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(26, 43, 74, 0.18), transparent 35%),
+    linear-gradient(135deg, #f5e3df 0%, #edf1f7 48%, #dfe8f3 100%);
+}
+
+.loginCard {
+  width: min(100%, 420px);
+  padding: 32px 28px;
+  border: 1px solid #d8e0ea;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(26, 43, 74, 0.08);
+}
+
+.brandBlock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.logoBadge {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: #1a2b4a;
+  color: #ffffff;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.kicker {
+  margin: 0 0 4px;
+  color: #7a8799;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  color: #1a2b4a;
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.welcomeBlock {
+  margin-bottom: 22px;
+}
+
+.heading {
+  margin: 0 0 8px;
+  color: #1a2b4a;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 0;
+  color: #6f7d90;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.form {
+  display: grid;
+  gap: 16px;
+}
+
+.fieldGroup {
+  display: grid;
+  gap: 8px;
+}
+
+.label {
+  color: #30405f;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.input {
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid #cfd8e3;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #1a2b4a;
+  font-size: 0.96rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input::placeholder {
+  color: #9aa6b7;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #1a2b4a;
+  box-shadow: 0 0 0 3px rgba(26, 43, 74, 0.12);
+}
+
+.inputError {
+  border-color: #d94b57;
+}
+
+.errorText {
+  color: #c83f4b;
+  font-size: 0.82rem;
+}
+
+.statusMessage {
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.statusError {
+  background: #fdecef;
+  color: #a12f39;
+}
+
+.statusSuccess {
+  background: #ecf7ef;
+  color: #237545;
+}
+
+.submitButton {
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 10px;
+  background: #e63946;
+  color: #ffffff;
+  font-size: 0.98rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.submitButton:disabled {
+  background: #e58b92;
+  cursor: not-allowed;
+}
+
+.submitButton:hover {
+  background: #cf313d;
+}
+
+.submitButton:active {
+  background: #b92b36;
+}
+
+@media (max-width: 640px) {
+  .loginCard {
+    padding: 26px 20px;
+  }
+}
