@@ -1,16 +1,17 @@
 import { useState } from 'react';
-import { api } from '../../api/services/api';
+import { getStoredSession, loginRequest } from '../../api/services/api';
 import styles from './LoginPage.module.css';
 
-const initialForm = await api.post("/auth/login", {
-  username: form.username,
-  password: form.password,
-});
+const initialForm = {
+  username: '',
+  password: '',
+};
 
-function LoginPage() {
+function LoginPage({ onLoginSuccess }) {
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const [statusMessage, setStatusMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -42,7 +43,7 @@ function LoginPage() {
     return nextErrors;
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
     const nextErrors = validateForm();
@@ -53,8 +54,29 @@ function LoginPage() {
       return;
     }
 
-    setErrors({});
-    setStatusMessage(`Acceso listo para validar con la API: ${form.username}`);
+    try {
+      setIsSubmitting(true);
+      setErrors({});
+      setStatusMessage('Validando credenciales...');
+
+      await loginRequest({
+        username: form.username.trim(),
+        password: form.password,
+      });
+
+      const session = getStoredSession();
+
+      if (!session?.token) {
+        throw new Error('La API no devolvio una sesion valida.');
+      }
+
+      setStatusMessage('Acceso concedido.');
+      onLoginSuccess?.(session);
+    } catch (error) {
+      setStatusMessage(error.message || 'No se pudo iniciar sesion.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -89,6 +111,7 @@ function LoginPage() {
               value={form.username}
               onChange={handleChange}
               autoComplete="username"
+              disabled={isSubmitting}
             />
             {errors.username ? (
               <span className={styles.errorText}>{errors.username}</span>
@@ -108,6 +131,7 @@ function LoginPage() {
               value={form.password}
               onChange={handleChange}
               autoComplete="current-password"
+              disabled={isSubmitting}
             />
             {errors.password ? (
               <span className={styles.errorText}>{errors.password}</span>
@@ -124,8 +148,8 @@ function LoginPage() {
             </div>
           ) : null}
 
-          <button className={styles.submitButton} type="submit">
-            Iniciar sesion
+          <button className={styles.submitButton} type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Ingresando...' : 'Iniciar sesion'}
           </button>
         </form>
       </div>

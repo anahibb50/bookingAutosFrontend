@@ -19,11 +19,11 @@ const initialForm = {
 
 function normalizeCiudad(item) {
   return {
-    id: item?.id ?? '',
-    nombre: item?.nombre ?? item?.nombreCiudad ?? '',
-    codigoPostal: item?.codigoPostal ?? '',
-    idPais: item?.idPais ?? '',
-    estado: item?.estado ?? '',
+    id: item?.id ?? item?.Id ?? '',
+    nombre: item?.nombre ?? item?.Nombre ?? item?.nombreCiudad ?? '',
+    codigoPostal: item?.codigoPostal ?? item?.CodigoPostal ?? '',
+    idPais: item?.idPais ?? item?.IdPais ?? '',
+    estado: item?.estado ?? item?.Estado ?? '',
     raw: item,
   };
 }
@@ -46,6 +46,10 @@ function extractItem(response, mapper) {
 
 function extractBoolean(response) {
   return Boolean(response?.data);
+}
+
+function keepOnlyDigits(value) {
+  return String(value ?? '').replace(/\D+/g, '');
 }
 
 function CiudadesPage({ onBack }) {
@@ -117,7 +121,7 @@ function CiudadesPage({ onBack }) {
 
       const payload = {
         nombreCiudad: form.nombreCiudad.trim(),
-        codigoPostal: form.codigoPostal.trim() || null,
+        codigoPostal: keepOnlyDigits(form.codigoPostal) || null,
         idPais: Number(form.idPais),
       };
 
@@ -333,11 +337,12 @@ function CiudadesPage({ onBack }) {
                 className={styles.input}
                 name="codigoPostal"
                 type="text"
+                inputMode="numeric"
                 value={form.codigoPostal}
                 onChange={(event) =>
                   setForm((currentForm) => ({
                     ...currentForm,
-                    codigoPostal: event.target.value,
+                    codigoPostal: keepOnlyDigits(event.target.value),
                   }))
                 }
                 placeholder="Codigo postal"
