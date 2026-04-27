@@ -7,7 +7,7 @@ const initialForm = {
   password: '',
 };
 
-function LoginPage({ onLoginSuccess }) {
+function LoginPage({ onLoginSuccess, onBack }) {
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const [statusMessage, setStatusMessage] = useState('');
@@ -82,6 +82,11 @@ function LoginPage({ onLoginSuccess }) {
   return (
     <section className={styles.loginPage}>
       <div className={styles.loginCard}>
+        {onBack ? (
+          <button type="button" className={styles.backButton} onClick={onBack}>
+            Volver al marketplace
+          </button>
+        ) : null}
         <div className={styles.brandBlock}>
           <div className={styles.logoBadge}>R</div>
           <div>

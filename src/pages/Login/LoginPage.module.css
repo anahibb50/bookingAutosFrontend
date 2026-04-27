@@ -18,6 +18,17 @@
   box-shadow: 0 12px 28px rgba(26, 43, 74, 0.08);
 }
 
+.backButton {
+  margin-bottom: 14px;
+  border: 1px solid #d3dce8;
+  border-radius: 10px;
+  background: #f5f7fb;
+  color: #1a2b4a;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .brandBlock {
   display: flex;
   align-items: center;

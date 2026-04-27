@@ -4,9 +4,10 @@ import {
   cancelFactura,
   createFactura,
   getFacturaById,
-  getFacturaByReserva,
-  getFacturasByCliente,
-  listFacturas,
+  getReservaById,
+  listClientes,
+  listConductores,
+  listExtrasActivos,
   listReservas,
   searchFacturas,
   updateFactura,
@@ -16,17 +17,14 @@ import styles from '../shared/CrudPage.module.css';
 const initialForm = {
   idReserva: '',
   descripcion: '',
-  origen: '',
 };
 
 const initialFilters = {
-  idCliente: '',
-  idReserva: '',
+  campoBusqueda: 'idCliente',
+  valorBusqueda: '',
   estado: '',
   fechaCreacionDesde: '',
   fechaCreacionHasta: '',
-  totalMin: '',
-  totalMax: '',
   pagina: 1,
   tamano: 10,
 };
@@ -54,6 +52,43 @@ function normalizeReserva(item) {
     id: item?.id ?? '',
     codigo: item?.codigo ?? '',
     idCliente: item?.idCliente ?? '',
+  };
+}
+
+function normalizeCliente(item) {
+  return {
+    id: item?.id ?? '',
+    nombre:
+      [item?.nombre, item?.apellido].filter(Boolean).join(' ') ||
+      item?.razonSocial ||
+      `Cliente ${item?.id ?? ''}`,
+  };
+}
+
+function normalizeExtra(item) {
+  const precio =
+    item?.precio ??
+    item?.valor ??
+    item?.valorUnitario ??
+    item?.ValorUnitario ??
+    item?.precioUnitario ??
+    item?.precioDia ??
+    item?.precioPorDia ??
+    item?.monto ??
+    0;
+  return {
+    id: item?.id ?? '',
+    nombre: item?.nombre ?? item?.nombreExtra ?? `Extra ${item?.id ?? ''}`,
+    precio: Number(precio),
+  };
+}
+
+function normalizeConductor(item) {
+  return {
+    id: item?.id ?? '',
+    nombre:
+      [item?.nombre1, item?.nombre2, item?.apellido1, item?.apellido2].filter(Boolean).join(' ') ||
+      `Conductor ${item?.id ?? ''}`,
   };
 }
 
@@ -102,14 +137,20 @@ function extractItem(response) {
 }
 
 function buildFiltersPayload(filters) {
+  const searchValue = String(filters.valorBusqueda || '').trim();
+  const parsedId = Number(searchValue);
+  const hasNumericId = Number.isFinite(parsedId) && parsedId > 0;
+
   return {
-    ...(filters.idCliente ? { idCliente: Number(filters.idCliente) } : {}),
-    ...(filters.idReserva ? { idReserva: Number(filters.idReserva) } : {}),
+    ...(searchValue && filters.campoBusqueda === 'idCliente' && hasNumericId
+      ? { idCliente: parsedId }
+      : {}),
+    ...(searchValue && filters.campoBusqueda === 'idReserva' && hasNumericId
+      ? { idReserva: parsedId }
+      : {}),
     ...(filters.estado ? { estado: filters.estado } : {}),
     ...(filters.fechaCreacionDesde ? { fechaCreacionDesde: filters.fechaCreacionDesde } : {}),
     ...(filters.fechaCreacionHasta ? { fechaCreacionHasta: filters.fechaCreacionHasta } : {}),
-    ...(filters.totalMin !== '' ? { totalMin: Number(filters.totalMin) } : {}),
-    ...(filters.totalMax !== '' ? { totalMax: Number(filters.totalMax) } : {}),
     pagina: Number(filters.pagina) || 1,
     tamano: Number(filters.tamano) || 10,
   };
@@ -131,9 +172,26 @@ function formatMoney(value) {
   });
 }
 
+function normalizeEstadoFactura(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+function isFacturaAbierta(estado) {
+  const normalized = normalizeEstadoFactura(estado);
+  return normalized === 'ABI' || normalized === 'ABIERTA';
+}
+
+function isFacturaCerrada(estado) {
+  const normalized = normalizeEstadoFactura(estado);
+  return normalized === 'APR' || normalized === 'APROBADA' || normalized === 'ANU' || normalized === 'ANULADA';
+}
+
 function FacturasPage({ onBack }) {
   const [facturas, setFacturas] = useState([]);
   const [reservas, setReservas] = useState([]);
+  const [clientes, setClientes] = useState([]);
+  const [extrasCatalog, setExtrasCatalog] = useState([]);
+  const [conductoresCatalog, setConductoresCatalog] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [filters, setFilters] = useState(initialFilters);
   const [editingId, setEditingId] = useState(null);
@@ -145,14 +203,47 @@ function FacturasPage({ onBack }) {
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modalState, setModalState] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    action: '',
+    targetId: null,
+    reason: '',
+    error: '',
+    detail: null,
+  });
+  const [isModalSubmitting, setIsModalSubmitting] = useState(false);
 
   const formTitle = useMemo(() => (editingId ? 'Editar factura' : 'Crear factura'), [editingId]);
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize || 1)), [pageSize, total]);
+  const searchPlaceholder = useMemo(
+    () => (filters.campoBusqueda === 'idCliente' ? 'Ingresa ID del cliente' : 'Ingresa ID de la reserva'),
+    [filters.campoBusqueda]
+  );
 
   const loadReservas = async () => {
     const response = await listReservas();
     const items = Array.isArray(response?.data) ? response.data.map(normalizeReserva) : [];
     setReservas(items);
+  };
+
+  const loadClientes = async () => {
+    const response = await listClientes();
+    const items = Array.isArray(response?.data) ? response.data.map(normalizeCliente) : [];
+    setClientes(items);
+  };
+
+  const loadExtras = async () => {
+    const response = await listExtrasActivos();
+    const items = Array.isArray(response?.data) ? response.data.map(normalizeExtra) : [];
+    setExtrasCatalog(items);
+  };
+
+  const loadConductores = async () => {
+    const response = await listConductores();
+    const items = Array.isArray(response?.data) ? response.data.map(normalizeConductor) : [];
+    setConductoresCatalog(items);
   };
 
   const loadFacturas = async (nextFilters = filters) => {
@@ -178,6 +269,15 @@ function FacturasPage({ onBack }) {
     loadReservas().catch(() => {
       setReservas([]);
     });
+    loadClientes().catch(() => {
+      setClientes([]);
+    });
+    loadExtras().catch(() => {
+      setExtrasCatalog([]);
+    });
+    loadConductores().catch(() => {
+      setConductoresCatalog([]);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -199,6 +299,7 @@ function FacturasPage({ onBack }) {
     setFilters((currentFilters) => ({
       ...currentFilters,
       [name]: value,
+      ...(name !== 'pagina' ? { pagina: 1 } : {}),
     }));
   };
 
@@ -223,7 +324,6 @@ function FacturasPage({ onBack }) {
         await createFactura({
           idReserva: Number(form.idReserva),
           descripcion: form.descripcion.trim() || null,
-          origen: form.origen.trim() || null,
         });
         setStatusMessage('Factura creada correctamente.');
       }
@@ -249,13 +349,16 @@ function FacturasPage({ onBack }) {
         setErrorMessage('No se pudo obtener la factura.');
         return;
       }
+      if (!isFacturaAbierta(factura.estado)) {
+        setErrorMessage('Solo se puede editar una factura abierta.');
+        return;
+      }
 
       setSelectedFactura(factura);
       setEditingId(factura.id);
       setForm({
         idReserva: factura.idReserva ? String(factura.idReserva) : '',
         descripcion: factura.descripcion || '',
-        origen: factura.origen || '',
       });
       setStatusMessage('Factura cargada para edicion.');
     } catch (error) {
@@ -263,79 +366,195 @@ function FacturasPage({ onBack }) {
     }
   };
 
-  const handleApprove = async (id) => {
-    try {
-      setErrorMessage('');
-      await approveFactura(id);
-      setStatusMessage('Factura aprobada correctamente.');
-      await loadFacturas(filters);
-    } catch (error) {
-      setErrorMessage(error.message || 'No se pudo aprobar la factura.');
+  const openActionModal = (action, targetId, title, message) => {
+    setModalState({
+      isOpen: true,
+      title,
+      message,
+      action,
+      targetId,
+      reason: '',
+      error: '',
+      detail: null,
+    });
+  };
+
+  const closeModal = (force = false) => {
+    if (!force && isModalSubmitting) {
+      return;
     }
+    setModalState((current) => ({
+      ...current,
+      isOpen: false,
+      error: '',
+      detail: null,
+    }));
+  };
+
+  const handleApprove = async (id) => {
+    const factura = facturas.find((item) => String(item.id) === String(id));
+    if (!isFacturaAbierta(factura?.estado)) {
+      setErrorMessage('Solo se puede aprobar una factura abierta.');
+      return;
+    }
+    openActionModal('approve', id, 'Aprobar factura', '¿Deseas aprobar esta factura?');
   };
 
   const handleCancel = async (id) => {
-    const motivo = window.prompt('Ingresa el motivo de anulacion:');
+    const factura = facturas.find((item) => String(item.id) === String(id));
+    if (!isFacturaAbierta(factura?.estado)) {
+      setErrorMessage('Solo se puede anular una factura abierta.');
+      return;
+    }
+    openActionModal(
+      'cancel',
+      id,
+      'Anular factura',
+      '¿Deseas anular esta factura? Ingresa el motivo para continuar.'
+    );
+  };
 
-    if (!motivo || !motivo.trim()) {
+  const handleModalConfirm = async () => {
+    if (modalState.action === 'view') {
+      closeModal();
       return;
     }
 
     try {
+      setIsModalSubmitting(true);
       setErrorMessage('');
-      await cancelFactura(id, motivo.trim());
-      setStatusMessage('Factura anulada correctamente.');
-      await loadFacturas(filters);
+
+      if (modalState.action === 'approve' && modalState.targetId) {
+        await approveFactura(modalState.targetId);
+        setStatusMessage('Factura aprobada correctamente.');
+        closeModal(true);
+        await loadFacturas(filters);
+        return;
+      }
+
+      if (modalState.action === 'cancel' && modalState.targetId) {
+        if (!modalState.reason.trim()) {
+          setModalState((current) => ({
+            ...current,
+            error: 'El motivo de anulacion es obligatorio.',
+          }));
+          return;
+        }
+        await cancelFactura(modalState.targetId, modalState.reason.trim());
+        setStatusMessage('Factura anulada correctamente.');
+        closeModal(true);
+        await loadFacturas(filters);
+      }
     } catch (error) {
-      setErrorMessage(error.message || 'No se pudo anular la factura.');
+      setErrorMessage(
+        error.message ||
+          (modalState.action === 'approve'
+            ? 'No se pudo aprobar la factura.'
+            : 'No se pudo anular la factura.')
+      );
+    } finally {
+      setIsModalSubmitting(false);
     }
   };
 
-  const handleSearchByCliente = async () => {
-    if (!filters.idCliente) {
-      await loadFacturas(filters);
-      return;
-    }
+  const getClienteNombre = (idCliente) =>
+    clientes.find((cliente) => String(cliente.id) === String(idCliente))?.nombre || `Cliente ${idCliente}`;
 
-    try {
-      setIsLoading(true);
-      setErrorMessage('');
-      const response = await getFacturasByCliente(Number(filters.idCliente));
-      const items = Array.isArray(response?.data) ? response.data.map(normalizeFactura) : [];
-      setFacturas(items);
-      setTotal(items.length);
-      setPage(1);
-      setStatusMessage(items.length ? 'Facturas encontradas por cliente.' : 'No se encontraron resultados.');
-    } catch (error) {
-      setFacturas([]);
-      setTotal(0);
-      setErrorMessage(error.message || 'No se pudo buscar por cliente.');
-    } finally {
-      setIsLoading(false);
-    }
+  const getReservaLabel = (idReserva) => {
+    const reserva = reservas.find((item) => String(item.id) === String(idReserva));
+    if (!reserva) return `Reserva ${idReserva}`;
+    const clienteNombre = getClienteNombre(reserva.idCliente);
+    return `${reserva.codigo || `Reserva ${reserva.id}`} - ${clienteNombre}`;
   };
 
-  const handleSearchByReserva = async () => {
-    if (!filters.idReserva) {
-      await loadFacturas(filters);
-      return;
-    }
-
+  const handleView = async (id) => {
     try {
-      setIsLoading(true);
       setErrorMessage('');
-      const response = await getFacturaByReserva(Number(filters.idReserva));
-      const factura = response?.data ? normalizeFactura(response.data) : null;
-      setFacturas(factura ? [factura] : []);
-      setTotal(factura ? 1 : 0);
-      setPage(1);
-      setStatusMessage(factura ? 'Factura encontrada por reserva.' : 'No existe factura para esa reserva.');
+      const facturaResponse = await getFacturaById(id);
+      const factura = extractItem(facturaResponse);
+      if (!factura) {
+        setErrorMessage('No se pudo obtener la factura.');
+        return;
+      }
+
+      const reservaResponse = await getReservaById(factura.idReserva);
+      const reservaData = reservaResponse?.data || {};
+
+      const extrasText =
+        Array.isArray(reservaData.extras) && reservaData.extras.length
+          ? reservaData.extras
+              .map((extra) => {
+                const extraCatalog = extrasCatalog.find(
+                  (catalogExtra) => String(catalogExtra.id) === String(extra?.idExtra)
+                );
+                const nombre =
+                  extra?.nombreExtra ||
+                  extra?.NombreExtra ||
+                  extraCatalog?.nombre ||
+                  `Extra ${extra?.idExtra || '-'}`;
+                const precioFromReserva =
+                  extra?.precio ??
+                  extra?.valor ??
+                  extra?.valorUnitario ??
+                  extra?.ValorUnitario ??
+                  extra?.precioUnitario ??
+                  extra?.precioDia ??
+                  extra?.precioPorDia ??
+                  extra?.monto;
+                const precio =
+                  Number(precioFromReserva ?? extraCatalog?.precio ?? 0);
+                const cantidad = Number(extra?.cantidad || 1);
+                const totalExtra = precio * cantidad;
+                return `${nombre} - ${formatMoney(precio)} x ${cantidad} = ${formatMoney(totalExtra)}`;
+              })
+              .join('\n')
+          : 'Sin extras';
+
+      const conductoresText =
+        Array.isArray(reservaData.conductores) && reservaData.conductores.length
+          ? reservaData.conductores
+              .map((conductor) => {
+                const conductorCatalog = conductoresCatalog.find(
+                  (catalogConductor) =>
+                    String(catalogConductor.id) === String(conductor?.idConductor)
+                );
+                const nombre = conductorCatalog?.nombre || `Conductor ${conductor?.idConductor || '-'}`;
+                return `${nombre} (${conductor?.rol || '-'})`;
+              })
+              .join('\n')
+          : 'Sin conductores';
+
+      setSelectedFactura(factura);
+      setModalState({
+        isOpen: true,
+        title: `Factura ${factura.id || '-'}`,
+        message: 'Detalle de factura y reserva asociada.',
+        action: 'view',
+        targetId: null,
+        reason: '',
+        error: '',
+        detail: {
+          idFactura: factura.id || '-',
+          idReserva: factura.idReserva || '-',
+          cliente: getClienteNombre(factura.idCliente),
+          estado: factura.estado || '-',
+          descripcion: factura.descripcion || '-',
+          subtotal: formatMoney(factura.subtotal),
+          iva: formatMoney(factura.iva),
+          total: formatMoney(factura.total),
+          aprobacion: formatDate(factura.fechaAprobacion),
+          anulacion: formatDate(factura.fechaAnulacion),
+          motivoAnulacion: factura.motivoAnulacion || '-',
+          reservaCodigo: reservaData?.codigo || factura.idReserva || '-',
+          reservaFechaInicio: formatDate(reservaData?.fechaInicio),
+          reservaFechaFin: formatDate(reservaData?.fechaFin),
+          reservaDescripcion: reservaData?.descripcion || '-',
+          extrasText,
+          conductoresText,
+        },
+      });
     } catch (error) {
-      setFacturas([]);
-      setTotal(0);
-      setErrorMessage(error.message || 'No se pudo buscar por reserva.');
-    } finally {
-      setIsLoading(false);
+      setErrorMessage(error.message || 'No se pudo obtener el detalle de la factura.');
     }
   };
 
@@ -382,20 +601,30 @@ function FacturasPage({ onBack }) {
 
           <div className={styles.filterGrid}>
             <label className={styles.fieldCompact}>
-              <span>ID cliente</span>
-              <input className={styles.input} name="idCliente" type="number" min="1" value={filters.idCliente} onChange={handleFilterChange} />
+              <span>Buscar por</span>
+              <select className={styles.select} name="campoBusqueda" value={filters.campoBusqueda} onChange={handleFilterChange}>
+                <option value="idCliente">ID cliente</option>
+                <option value="idReserva">ID reserva</option>
+              </select>
             </label>
 
             <label className={styles.fieldCompact}>
-              <span>ID reserva</span>
-              <input className={styles.input} name="idReserva" type="number" min="1" value={filters.idReserva} onChange={handleFilterChange} />
+              <span>Valor</span>
+              <input
+                className={styles.input}
+                name="valorBusqueda"
+                type="text"
+                value={filters.valorBusqueda}
+                placeholder={searchPlaceholder}
+                onChange={handleFilterChange}
+              />
             </label>
 
             <label className={styles.fieldCompact}>
               <span>Estado</span>
               <select className={styles.select} name="estado" value={filters.estado} onChange={handleFilterChange}>
                 <option value="">Todos</option>
-                <option value="PEN">Pendiente</option>
+                <option value="ABI">Abierta</option>
                 <option value="APR">Aprobada</option>
                 <option value="ANU">Anulada</option>
               </select>
@@ -412,16 +641,6 @@ function FacturasPage({ onBack }) {
             </label>
 
             <label className={styles.fieldCompact}>
-              <span>Total minimo</span>
-              <input className={styles.input} name="totalMin" type="number" min="0" step="0.01" value={filters.totalMin} onChange={handleFilterChange} />
-            </label>
-
-            <label className={styles.fieldCompact}>
-              <span>Total maximo</span>
-              <input className={styles.input} name="totalMax" type="number" min="0" step="0.01" value={filters.totalMax} onChange={handleFilterChange} />
-            </label>
-
-            <label className={styles.fieldCompact}>
               <span>Tamano</span>
               <select className={styles.select} name="tamano" value={filters.tamano} onChange={handleFilterChange}>
                 <option value="5">5</option>
@@ -434,28 +653,17 @@ function FacturasPage({ onBack }) {
 
           <div className={styles.searchRow}>
             <button className={styles.primaryButton} type="button" onClick={handleFilterSubmit}>
-              Buscar con filtros
-            </button>
-            <button className={styles.secondaryButton} type="button" onClick={handleSearchByCliente}>
-              Buscar por cliente
-            </button>
-            <button className={styles.secondaryButton} type="button" onClick={handleSearchByReserva}>
-              Buscar por reserva
+              Buscar
             </button>
             <button
               className={styles.secondaryButton}
               type="button"
               onClick={async () => {
                 setFilters(initialFilters);
-                const response = await listFacturas();
-                const items = Array.isArray(response?.data) ? response.data.map(normalizeFactura) : [];
-                setFacturas(items);
-                setTotal(items.length);
-                setPage(1);
-                setPageSize(10);
+                await loadFacturas(initialFilters);
               }}
             >
-              Listar todo
+              Limpiar
             </button>
           </div>
 
@@ -484,30 +692,38 @@ function FacturasPage({ onBack }) {
                   <tr key={factura.id || factura.guid || `${factura.idReserva}-${factura.idCliente}`}>
                     <td>{factura.id || '-'}</td>
                     <td>{factura.idReserva || '-'}</td>
-                    <td>{factura.idCliente || '-'}</td>
+                    <td>{getClienteNombre(factura.idCliente)}</td>
                     <td>{formatMoney(factura.total)}</td>
                     <td>
-                      <span
-                        className={`${styles.badge} ${
-                          factura.estado === 'APR' || factura.estado === 'ACT'
-                            ? styles.badgeActive
-                            : styles.badgeInactive
-                        }`}
-                      >
+                      <span className={`${styles.badge} ${
+                        normalizeEstadoFactura(factura.estado) === 'ABI' || normalizeEstadoFactura(factura.estado) === 'ABIERTA'
+                          ? styles.badgeWarning
+                          : normalizeEstadoFactura(factura.estado) === 'ANU' || normalizeEstadoFactura(factura.estado) === 'ANULADA'
+                            ? styles.badgeInactive
+                            : styles.badgeActive
+                      }`}>
                         {factura.estado || '-'}
                       </span>
                     </td>
                     <td>
                       <div className={styles.actions}>
-                        <button className={styles.linkButton} type="button" onClick={() => handleEdit(factura.id)}>
-                          Editar
-                        </button>
-                        <button className={styles.linkButton} type="button" onClick={() => handleApprove(factura.id)}>
-                          Aprobar
-                        </button>
-                        <button className={styles.linkDanger} type="button" onClick={() => handleCancel(factura.id)}>
-                          Anular
-                        </button>
+                        {isFacturaAbierta(factura.estado) ? (
+                          <>
+                            <button className={styles.linkButton} type="button" onClick={() => handleEdit(factura.id)}>
+                              Editar
+                            </button>
+                            <button className={styles.linkButton} type="button" onClick={() => handleApprove(factura.id)}>
+                              Aprobar
+                            </button>
+                            <button className={styles.linkDanger} type="button" onClick={() => handleCancel(factura.id)}>
+                              Anular
+                            </button>
+                          </>
+                        ) : isFacturaCerrada(factura.estado) ? (
+                          <button className={styles.linkButton} type="button" onClick={() => handleView(factura.id)}>
+                            Ver
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -552,7 +768,7 @@ function FacturasPage({ onBack }) {
                 <option value="">Selecciona una reserva</option>
                 {reservas.map((reserva) => (
                   <option key={reserva.id} value={reserva.id}>
-                    {reserva.codigo ? `${reserva.codigo} - Cliente ${reserva.idCliente}` : `Reserva ${reserva.id}`}
+                    {getReservaLabel(reserva.id)}
                   </option>
                 ))}
               </select>
@@ -565,18 +781,6 @@ function FacturasPage({ onBack }) {
                 name="descripcion"
                 value={form.descripcion}
                 onChange={handleFormChange}
-              />
-            </label>
-
-            <label className={styles.field}>
-              <span>Origen</span>
-              <input
-                className={styles.input}
-                name="origen"
-                type="text"
-                value={form.origen}
-                onChange={handleFormChange}
-                disabled={Boolean(editingId)}
               />
             </label>
 
@@ -610,6 +814,114 @@ function FacturasPage({ onBack }) {
           ) : null}
         </section>
       </div>
+
+      {modalState.isOpen ? (
+        <>
+          <div
+            className="modal fade show"
+            style={{ display: 'block' }}
+            tabIndex="-1"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => closeModal()}
+          >
+            <div
+              className="modal-dialog modal-dialog-centered modal-lg"
+              role="document"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">{modalState.title}</h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    aria-label="Cerrar"
+                    onClick={closeModal}
+                    disabled={isModalSubmitting}
+                  />
+                </div>
+                <div className="modal-body">
+                  <p className="mb-2">{modalState.message}</p>
+                  {modalState.action === 'view' && modalState.detail ? (
+                    <div className="small">
+                      <p className="mb-1"><strong>Factura:</strong> {modalState.detail.idFactura}</p>
+                      <p className="mb-1"><strong>Reserva:</strong> {modalState.detail.idReserva}</p>
+                      <p className="mb-1"><strong>Cliente:</strong> {modalState.detail.cliente}</p>
+                      <p className="mb-1"><strong>Estado:</strong> {modalState.detail.estado}</p>
+                      <p className="mb-1"><strong>Descripcion:</strong> {modalState.detail.descripcion}</p>
+                      <p className="mb-1"><strong>Subtotal:</strong> {modalState.detail.subtotal}</p>
+                      <p className="mb-1"><strong>IVA:</strong> {modalState.detail.iva}</p>
+                      <p className="mb-1"><strong>Total:</strong> {modalState.detail.total}</p>
+                      <p className="mb-1"><strong>Aprobacion:</strong> {modalState.detail.aprobacion}</p>
+                      <p className="mb-1"><strong>Anulacion:</strong> {modalState.detail.anulacion}</p>
+                      <p className="mb-1"><strong>Motivo anulacion:</strong> {modalState.detail.motivoAnulacion}</p>
+                      <hr />
+                      <p className="mb-1"><strong>Reserva codigo:</strong> {modalState.detail.reservaCodigo}</p>
+                      <p className="mb-1"><strong>Inicio:</strong> {modalState.detail.reservaFechaInicio}</p>
+                      <p className="mb-1"><strong>Fin:</strong> {modalState.detail.reservaFechaFin}</p>
+                      <p className="mb-1"><strong>Detalle reserva:</strong> {modalState.detail.reservaDescripcion}</p>
+                      <p className="mb-1"><strong>Extras:</strong></p>
+                      <pre className="bg-light p-2 border rounded">{modalState.detail.extrasText}</pre>
+                      <p className="mb-1"><strong>Conductores:</strong></p>
+                      <pre className="bg-light p-2 border rounded">{modalState.detail.conductoresText}</pre>
+                    </div>
+                  ) : null}
+                  {modalState.action === 'cancel' ? (
+                    <div className="mt-2">
+                      <label className="form-label" htmlFor="cancel-reason-factura">
+                        Motivo de anulacion
+                      </label>
+                      <textarea
+                        id="cancel-reason-factura"
+                        className="form-control"
+                        rows="3"
+                        value={modalState.reason}
+                        onChange={(event) =>
+                          setModalState((current) => ({
+                            ...current,
+                            reason: event.target.value,
+                            error: '',
+                          }))
+                        }
+                        disabled={isModalSubmitting}
+                      />
+                    </div>
+                  ) : null}
+                  {modalState.error ? (
+                    <div className="text-danger mt-2">{modalState.error}</div>
+                  ) : null}
+                </div>
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => closeModal()}
+                    disabled={isModalSubmitting}
+                  >
+                    Cerrar
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn ${modalState.action === 'cancel' ? 'btn-danger' : 'btn-primary'}`}
+                    onClick={handleModalConfirm}
+                    disabled={isModalSubmitting || modalState.action === 'view'}
+                  >
+                    {isModalSubmitting
+                      ? 'Procesando...'
+                      : modalState.action === 'approve'
+                        ? 'Aprobar'
+                        : modalState.action === 'cancel'
+                          ? 'Anular factura'
+                          : 'Aceptar'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show" />
+        </>
+      ) : null}
     </div>
   );
 }

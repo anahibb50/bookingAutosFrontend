@@ -4,7 +4,6 @@ import {
   deleteCliente,
   existsClienteIdentificacion,
   getClienteById,
-  getClienteByIdentificacion,
   listCiudades,
   searchClientes,
   updateCliente,
@@ -25,13 +24,11 @@ const initialForm = {
 };
 
 const initialFilters = {
-  nombre: '',
-  apellido: '',
-  identificacion: '',
+  campoBusqueda: 'nombre',
+  valorBusqueda: '',
   tipoIdentificacion: '',
   idCiudad: '',
   estado: '',
-  email: '',
   pagina: 1,
   tamano: 10,
 };
@@ -106,16 +103,16 @@ function normalizeCiudad(item) {
 }
 
 function buildFiltersPayload(filters) {
+  const searchValue = filters.valorBusqueda.trim();
+  const searchField = filters.campoBusqueda;
   return {
-    ...(filters.nombre.trim() ? { nombre: filters.nombre.trim() } : {}),
-    ...(filters.apellido.trim() ? { apellido: filters.apellido.trim() } : {}),
-    ...(filters.identificacion.trim()
-      ? { identificacion: filters.identificacion.trim() }
-      : {}),
+    ...(searchValue && searchField === 'nombre' ? { nombre: searchValue } : {}),
+    ...(searchValue && searchField === 'apellido' ? { apellido: searchValue } : {}),
+    ...(searchValue && searchField === 'identificacion' ? { identificacion: searchValue } : {}),
+    ...(searchValue && searchField === 'email' ? { email: searchValue } : {}),
     ...(filters.tipoIdentificacion ? { tipoIdentificacion: filters.tipoIdentificacion } : {}),
     ...(filters.idCiudad ? { idCiudad: Number(filters.idCiudad) } : {}),
     ...(filters.estado ? { estado: filters.estado } : {}),
-    ...(filters.email.trim() ? { email: filters.email.trim() } : {}),
     pagina: Number(filters.pagina) || 1,
     tamano: Number(filters.tamano) || 10,
   };
@@ -132,9 +129,13 @@ function normalizeIdentificacionByTipo(tipoIdentificacion, identificacion) {
   const tipo = normalizeTipoIdentificacion(tipoIdentificacion);
   const value = String(identificacion || '').trim();
   if (tipo === 'CEDULA' || tipo === 'RUC') {
-    return value.replace(/\D/g, '');
+    const maxLength = tipo === 'CEDULA' ? 10 : 13;
+    return value.replace(/\D/g, '').slice(0, maxLength);
   }
-  return value;
+  if (tipo === 'PASAPORTE') {
+    return value.slice(0, 20);
+  }
+  return value.slice(0, 20);
 }
 
 function normalizeTelefono(value) {
@@ -160,6 +161,12 @@ function ClientesPage({ onBack }) {
 
   const formTitle = useMemo(() => (editingId ? 'Editar cliente' : 'Crear cliente'), [editingId]);
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize || 1)), [pageSize, total]);
+  const searchPlaceholder = useMemo(() => {
+    if (filters.campoBusqueda === 'apellido') return 'Buscar por apellido';
+    if (filters.campoBusqueda === 'identificacion') return 'Buscar por identificacion';
+    if (filters.campoBusqueda === 'email') return 'Buscar por email';
+    return 'Buscar por nombre';
+  }, [filters.campoBusqueda]);
 
   const getCiudadNombre = (idCiudad) => {
     return ciudades.find((ciudad) => String(ciudad.id) === String(idCiudad))?.nombre || '-';
@@ -190,16 +197,19 @@ function ClientesPage({ onBack }) {
   };
 
   useEffect(() => {
-    const boot = async () => {
-      await loadClientes(initialFilters);
-    };
-
-    boot();
     loadCiudades().catch((error) => {
       setErrorMessage(error.message || 'No se pudo cargar el catalogo de ciudades.');
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      loadClientes(filters);
+    }, 250);
+
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
 
   const resetForm = () => {
     setForm(initialForm);
@@ -226,6 +236,7 @@ function ClientesPage({ onBack }) {
     setFilters((currentFilters) => ({
       ...currentFilters,
       [name]: name === 'tipoIdentificacion' ? normalizeTipoIdentificacion(value) : value,
+      ...(name !== 'pagina' ? { pagina: 1 } : {}),
     }));
   };
 
@@ -254,6 +265,13 @@ function ClientesPage({ onBack }) {
     }
     if (normalizedTipoIdentificacion === 'RUC' && normalizedIdentificacion.length !== 13) {
       setErrorMessage('El RUC debe tener 13 digitos.');
+      return;
+    }
+    if (
+      normalizedTipoIdentificacion === 'PASAPORTE' &&
+      (normalizedIdentificacion.length < 7 || normalizedIdentificacion.length > 20)
+    ) {
+      setErrorMessage('El pasaporte debe tener entre 7 y 20 caracteres.');
       return;
     }
     if (form.telefono.trim() && normalizeTelefono(form.telefono).length !== 10) {
@@ -355,41 +373,10 @@ function ClientesPage({ onBack }) {
     }
   };
 
-  const handleSearchByIdentificacion = async () => {
-    if (!filters.identificacion.trim()) {
-      await loadClientes(filters);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setErrorMessage('');
-      const response = await getClienteByIdentificacion(filters.identificacion.trim());
-      const cliente = extractItem(response);
-      setClientes(cliente ? [cliente] : []);
-      setTotal(cliente ? 1 : 0);
-      setPage(1);
-      setStatusMessage(cliente ? 'Cliente encontrado.' : 'No se encontraron resultados.');
-    } catch (error) {
-      setClientes([]);
-      setTotal(0);
-      setErrorMessage(error.message || 'No se pudo buscar por identificacion.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleFilterSubmit = async () => {
-    const nextFilters = { ...filters, pagina: 1 };
-    setFilters(nextFilters);
-    await loadClientes(nextFilters);
-  };
-
   const changePage = async (nextPage) => {
     const safePage = Math.min(Math.max(nextPage, 1), totalPages);
     const nextFilters = { ...filters, pagina: safePage };
     setFilters(nextFilters);
-    await loadClientes(nextFilters);
   };
 
   return (
@@ -400,7 +387,7 @@ function ClientesPage({ onBack }) {
             Regresar
           </button>
           <h2>Clientes</h2>
-          <p>Gestiona clientes con filtros paginados e identificacion unica.</p>
+          <p>Gestiona clientes con busqueda dinamica y filtros paginados.</p>
         </div>
         <button className={styles.secondaryButton} type="button" onClick={() => loadClientes(filters)}>
           Recargar
@@ -422,34 +409,28 @@ function ClientesPage({ onBack }) {
 
           <div className={styles.filterGrid}>
             <label className={styles.fieldCompact}>
-              <span>Nombre</span>
-              <input
-                className={styles.input}
-                name="nombre"
-                type="text"
-                value={filters.nombre}
+              <span>Buscar por</span>
+              <select
+                className={styles.select}
+                name="campoBusqueda"
+                value={filters.campoBusqueda}
                 onChange={handleFilterChange}
-              />
+              >
+                <option value="nombre">Nombre</option>
+                <option value="apellido">Apellido</option>
+                <option value="identificacion">Identificacion</option>
+                <option value="email">Email</option>
+              </select>
             </label>
 
             <label className={styles.fieldCompact}>
-              <span>Apellido</span>
+              <span>Valor</span>
               <input
                 className={styles.input}
-                name="apellido"
+                name="valorBusqueda"
                 type="text"
-                value={filters.apellido}
-                onChange={handleFilterChange}
-              />
-            </label>
-
-            <label className={styles.fieldCompact}>
-              <span>Identificacion</span>
-              <input
-                className={styles.input}
-                name="identificacion"
-                type="text"
-                value={filters.identificacion}
+                value={filters.valorBusqueda}
+                placeholder={searchPlaceholder}
                 onChange={handleFilterChange}
               />
             </label>
@@ -501,17 +482,6 @@ function ClientesPage({ onBack }) {
             </label>
 
             <label className={styles.fieldCompact}>
-              <span>Email</span>
-              <input
-                className={styles.input}
-                name="email"
-                type="text"
-                value={filters.email}
-                onChange={handleFilterChange}
-              />
-            </label>
-
-            <label className={styles.fieldCompact}>
               <span>Tamano</span>
               <select
                 className={styles.select}
@@ -528,12 +498,6 @@ function ClientesPage({ onBack }) {
           </div>
 
           <div className={styles.searchRow}>
-            <button className={styles.primaryButton} type="button" onClick={handleFilterSubmit}>
-              Buscar con filtros
-            </button>
-            <button className={styles.secondaryButton} type="button" onClick={handleSearchByIdentificacion}>
-              Buscar por identificacion
-            </button>
             <button
               className={styles.secondaryButton}
               type="button"
@@ -554,7 +518,7 @@ function ClientesPage({ onBack }) {
                   <th>Nombre</th>
                   <th>Identificacion</th>
                   <th>Ciudad</th>
-                  <th>Contacto</th>
+                  <th>Email</th>
                   <th>Estado</th>
                   <th>Acciones</th>
                 </tr>
@@ -574,13 +538,9 @@ function ClientesPage({ onBack }) {
                     <td>{`${cliente.nombre || ''} ${cliente.apellido || ''}`.trim() || '-'}</td>
                     <td>{`${cliente.tipoIdentificacion || ''} ${cliente.identificacion || ''}`.trim() || '-'}</td>
                     <td>{getCiudadNombre(cliente.idCiudad)}</td>
-                    <td>{cliente.email || cliente.telefono || '-'}</td>
+                    <td>{cliente.email || '-'}</td>
                     <td>
-                      <span
-                        className={`${styles.badge} ${
-                          cliente.estado === 'ACT' ? styles.badgeActive : styles.badgeInactive
-                        }`}
-                      >
+                      <span className={`${styles.badge} ${styles.badgeActive}`}>
                         {cliente.estado || '-'}
                       </span>
                     </td>
@@ -700,6 +660,13 @@ function ClientesPage({ onBack }) {
                   type="text"
                   value={form.identificacion}
                   onChange={handleFormChange}
+                  maxLength={
+                    form.tipoIdentificacion === 'CEDULA'
+                      ? 10
+                      : form.tipoIdentificacion === 'RUC'
+                        ? 13
+                        : 20
+                  }
                 />
               </label>
             </div>

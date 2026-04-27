@@ -3,9 +3,8 @@ import {
   cancelReserva,
   confirmReserva,
   createReserva,
+  getVehiculosDisponibles,
   getReservaById,
-  getReservasByCliente,
-  getReservasByVehiculo,
   listClientes,
   listConductores,
   listExtrasActivos,
@@ -23,7 +22,7 @@ const emptyExtra = {
 
 const emptyConductor = {
   idConductor: '',
-  rol: 'TITULAR',
+  rol: 'PRI',
   esPrincipal: true,
   observaciones: '',
 };
@@ -44,16 +43,12 @@ const initialForm = {
 };
 
 const initialFilters = {
-  idCliente: '',
-  idVehiculo: '',
-  idLocalizacionRecogida: '',
-  idLocalizacionEntrega: '',
+  campoBusqueda: 'codigoReserva',
+  valorBusqueda: '',
   fechaInicioDesde: '',
   fechaInicioHasta: '',
   fechaFinDesde: '',
   fechaFinHasta: '',
-  estado: '',
-  codigoReserva: '',
   pagina: 1,
   tamano: 10,
 };
@@ -87,6 +82,15 @@ function normalizeLocalizacion(item) {
     id: item?.id ?? '',
     nombre: item?.nombre ?? '',
     idCiudad: item?.idCiudad ?? '',
+  };
+}
+
+function normalizeVehiculo(item) {
+  return {
+    id: item?.id ?? item?.Id ?? '',
+    placa: item?.placa ?? item?.Placa ?? '',
+    modelo: item?.modelo ?? item?.Modelo ?? '',
+    idLocalizacion: item?.idLocalizacion ?? item?.IdLocalizacion ?? '',
   };
 }
 
@@ -162,18 +166,47 @@ function extractItem(response) {
   return response?.data ? normalizeReserva(response.data) : null;
 }
 
-function buildFiltersPayload(filters) {
+function buildFiltersPayload(filters, clientes = [], vehiculos = []) {
+  const searchValue = String(filters.valorBusqueda || '').trim();
+  const searchField = filters.campoBusqueda;
+  const parsedId = Number(searchValue);
+  const hasNumericId = Number.isFinite(parsedId) && parsedId > 0;
+  const normalizedSearch = searchValue.toLowerCase();
+
+  const matchedCliente = !hasNumericId
+    ? clientes.find((cliente) => {
+        const idText = String(cliente.id || '');
+        const nombreText = String(cliente.nombre || '').toLowerCase();
+        return idText === searchValue || nombreText.includes(normalizedSearch);
+      })
+    : null;
+
+  const matchedVehiculo = !hasNumericId
+    ? vehiculos.find((vehiculo) => {
+        const idText = String(vehiculo.id || '');
+        const placaText = String(vehiculo.placa || '').toLowerCase();
+        const modeloText = String(vehiculo.modelo || '').toLowerCase();
+        return (
+          idText === searchValue ||
+          placaText.includes(normalizedSearch) ||
+          `${placaText} ${modeloText}`.includes(normalizedSearch)
+        );
+      })
+    : null;
+
+  const resolvedClienteId = hasNumericId ? parsedId : Number(matchedCliente?.id || 0);
+  const resolvedVehiculoId = hasNumericId ? parsedId : Number(matchedVehiculo?.id || 0);
+  const hasClienteId = Number.isFinite(resolvedClienteId) && resolvedClienteId > 0;
+  const hasVehiculoId = Number.isFinite(resolvedVehiculoId) && resolvedVehiculoId > 0;
+
   return {
-    ...(filters.idCliente ? { idCliente: Number(filters.idCliente) } : {}),
-    ...(filters.idVehiculo ? { idVehiculo: Number(filters.idVehiculo) } : {}),
-    ...(filters.idLocalizacionRecogida ? { idLocalizacionRecogida: Number(filters.idLocalizacionRecogida) } : {}),
-    ...(filters.idLocalizacionEntrega ? { idLocalizacionEntrega: Number(filters.idLocalizacionEntrega) } : {}),
+    ...(searchValue && searchField === 'idCliente' && hasClienteId ? { idCliente: resolvedClienteId } : {}),
+    ...(searchValue && searchField === 'idVehiculo' && hasVehiculoId ? { idVehiculo: resolvedVehiculoId } : {}),
+    ...(searchValue && searchField === 'codigoReserva' ? { codigoReserva: searchValue } : {}),
     ...(filters.fechaInicioDesde ? { fechaInicioDesde: filters.fechaInicioDesde } : {}),
     ...(filters.fechaInicioHasta ? { fechaInicioHasta: filters.fechaInicioHasta } : {}),
     ...(filters.fechaFinDesde ? { fechaFinDesde: filters.fechaFinDesde } : {}),
     ...(filters.fechaFinHasta ? { fechaFinHasta: filters.fechaFinHasta } : {}),
-    ...(filters.estado ? { estado: filters.estado } : {}),
-    ...(filters.codigoReserva.trim() ? { codigoReserva: filters.codigoReserva.trim() } : {}),
     pagina: Number(filters.pagina) || 1,
     tamano: Number(filters.tamano) || 10,
   };
@@ -195,12 +228,43 @@ function formatMoney(value) {
   });
 }
 
+function buildDateTimeForAvailability(dateValue, timeValue, isEnd) {
+  if (!dateValue) {
+    return '';
+  }
+
+  const normalizedTime = timeValue?.trim() || (isEnd ? '23:59' : '00:00');
+  return `${dateValue}T${normalizedTime}:00`;
+}
+
+function normalizeRolConductor(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (normalized === 'TITULAR' || normalized === 'PRINCIPAL' || normalized === 'PRI') {
+    return 'PRI';
+  }
+  if (normalized === 'SECUNDARIO' || normalized === 'SEC') {
+    return 'SEC';
+  }
+  return 'SEC';
+}
+
+function isReservaPendiente(estado) {
+  const normalized = String(estado || '').trim().toUpperCase();
+  return normalized === 'PEN' || normalized === 'PENDIENTE';
+}
+
+function isReservaBloqueada(estado) {
+  const normalized = String(estado || '').trim().toUpperCase();
+  return normalized === 'CON' || normalized === 'CONFIRMADA' || normalized === 'CAN' || normalized === 'CANCELADA';
+}
+
 function ReservasPage({ onBack }) {
   const [reservas, setReservas] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [conductoresCatalog, setConductoresCatalog] = useState([]);
   const [extrasCatalog, setExtrasCatalog] = useState([]);
   const [localizaciones, setLocalizaciones] = useState([]);
+  const [vehiculosDisponibles, setVehiculosDisponibles] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [filters, setFilters] = useState(initialFilters);
   const [editingId, setEditingId] = useState(null);
@@ -213,9 +277,25 @@ function ReservasPage({ onBack }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availabilityMessage, setAvailabilityMessage] = useState('');
+  const [modalState, setModalState] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    action: '',
+    targetId: null,
+    reason: '',
+    error: '',
+    detail: null,
+  });
+  const [isModalSubmitting, setIsModalSubmitting] = useState(false);
 
   const formTitle = useMemo(() => (editingId ? 'Editar reserva' : 'Crear reserva'), [editingId]);
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize || 1)), [pageSize, total]);
+  const searchPlaceholder = useMemo(() => {
+    if (filters.campoBusqueda === 'idCliente') return 'ID o nombre del cliente';
+    if (filters.campoBusqueda === 'idVehiculo') return 'ID o placa del vehiculo';
+    return 'Buscar por codigo reserva';
+  }, [filters.campoBusqueda]);
 
   const getClienteNombre = (idCliente) =>
     clientes.find((cliente) => String(cliente.id) === String(idCliente))?.nombre || `Cliente ${idCliente}`;
@@ -224,12 +304,22 @@ function ReservasPage({ onBack }) {
     localizaciones.find((localizacion) => String(localizacion.id) === String(idLocalizacion))?.nombre ||
     `Loc. ${idLocalizacion}`;
 
+  const getVehiculoLabel = (idVehiculo) => {
+    const vehiculo = vehiculosDisponibles.find((item) => String(item.id) === String(idVehiculo));
+    if (!vehiculo) {
+      return idVehiculo ? `Vehiculo ${idVehiculo}` : '-';
+    }
+
+    return `${vehiculo.placa || `Vehiculo ${vehiculo.id}`} ${vehiculo.modelo || ''}`.trim();
+  };
+
   const loadCatalogs = async () => {
-    const [clientesResponse, conductoresResponse, extrasResponse, localizacionesResponse] = await Promise.all([
+    const [clientesResponse, conductoresResponse, extrasResponse, localizacionesResponse, vehiculosResponse] = await Promise.all([
       listClientes(),
       listConductores(),
       listExtrasActivos(),
       listLocalizaciones(),
+      getVehiculosDisponibles(),
     ]);
 
     setClientes(Array.isArray(clientesResponse?.data) ? clientesResponse.data.map(normalizeCliente) : []);
@@ -242,13 +332,17 @@ function ReservasPage({ onBack }) {
         ? localizacionesResponse.data.map(normalizeLocalizacion)
         : []
     );
+    setVehiculosDisponibles(
+      Array.isArray(vehiculosResponse?.data) ? vehiculosResponse.data.map(normalizeVehiculo) : []
+    );
   };
 
   const loadReservas = async (nextFilters = filters) => {
     try {
       setIsLoading(true);
       setErrorMessage('');
-      const response = await searchReservas(buildFiltersPayload(nextFilters));
+      const payload = buildFiltersPayload(nextFilters, clientes, vehiculosDisponibles);
+      const response = await searchReservas(payload);
       const result = extractPagedItems(response);
       setReservas(result.items);
       setTotal(result.total);
@@ -276,8 +370,57 @@ function ReservasPage({ onBack }) {
     setAvailabilityMessage('');
   };
 
+  const openInfoModal = (title, message) => {
+    setModalState({
+      isOpen: true,
+      title,
+      message,
+      action: 'info',
+      targetId: null,
+      reason: '',
+      error: '',
+      detail: null,
+    });
+  };
+
+  const openActionModal = (action, targetId, title, message) => {
+    setModalState({
+      isOpen: true,
+      title,
+      message,
+      action,
+      targetId,
+      reason: '',
+      error: '',
+      detail: null,
+    });
+  };
+
+  const closeModal = (force = false) => {
+    if (!force && isModalSubmitting) {
+      return;
+    }
+
+    setModalState((current) => ({
+      ...current,
+      isOpen: false,
+      error: '',
+      detail: null,
+    }));
+  };
+
   const handleFormChange = (event) => {
     const { name, value } = event.target;
+    if (name === 'idVehiculo') {
+      const vehiculo = vehiculosDisponibles.find((item) => String(item.id) === String(value));
+      setForm((currentForm) => ({
+        ...currentForm,
+        idVehiculo: value,
+        idLocalizacionRecogida: vehiculo?.idLocalizacion ? String(vehiculo.idLocalizacion) : '',
+      }));
+      return;
+    }
+
     setForm((currentForm) => ({
       ...currentForm,
       [name]: value,
@@ -289,6 +432,7 @@ function ReservasPage({ onBack }) {
     setFilters((currentFilters) => ({
       ...currentFilters,
       [name]: value,
+      ...(name !== 'pagina' ? { pagina: 1 } : {}),
     }));
   };
 
@@ -353,6 +497,9 @@ function ReservasPage({ onBack }) {
 
       if (editingId) {
         await updateReserva(editingId, {
+          idCliente: Number(form.idCliente),
+          idVehiculo: Number(form.idVehiculo),
+          cantidadDias: Number(form.cantidadDias),
           fechaInicio: form.fechaInicio,
           fechaFin: form.fechaFin,
           horaInicio: form.horaInicio || null,
@@ -384,7 +531,7 @@ function ReservasPage({ onBack }) {
             .filter((conductor) => conductor.idConductor)
             .map((conductor) => ({
               idConductor: Number(conductor.idConductor),
-              rol: conductor.rol,
+              rol: normalizeRolConductor(conductor.rol),
               esPrincipal: Boolean(conductor.esPrincipal),
               observaciones: conductor.observaciones.trim() || null,
             })),
@@ -413,6 +560,10 @@ function ReservasPage({ onBack }) {
         setErrorMessage('No se pudo obtener la reserva.');
         return;
       }
+      if (!isReservaPendiente(reserva.estado)) {
+        setErrorMessage('Solo se puede editar una reserva pendiente.');
+        return;
+      }
 
       setSelectedReserva(reserva);
       setEditingId(reserva.id);
@@ -436,93 +587,118 @@ function ReservasPage({ onBack }) {
         conductores: Array.isArray(reserva.conductores)
           ? reserva.conductores.map((conductor) => ({
               idConductor: conductor?.idConductor ? String(conductor.idConductor) : '',
-              rol: conductor?.rol || 'SECUNDARIO',
+              rol: normalizeRolConductor(conductor?.rol),
               esPrincipal: Boolean(conductor?.esPrincipal),
               observaciones: conductor?.observaciones || '',
             }))
           : [{ ...emptyConductor }],
       });
       setStatusMessage('Reserva cargada para edicion.');
-      setAvailabilityMessage('Al editar solo se actualizan fechas, localizaciones y descripcion.');
+      setAvailabilityMessage('');
+    } catch (error) {
+      setErrorMessage(error.message || 'No se pudo obtener la reserva.');
+    }
+  };
+
+  const handleView = async (id) => {
+    try {
+      setErrorMessage('');
+      const response = await getReservaById(id);
+      const reserva = extractItem(response);
+
+      if (!reserva) {
+        setErrorMessage('No se pudo obtener la reserva.');
+        return;
+      }
+
+      const extrasText =
+        reserva.extras?.length > 0
+          ? reserva.extras
+              .map((extra) => {
+                const extraCatalog = extrasCatalog.find((item) => String(item.id) === String(extra?.idExtra));
+                const nombreExtra = extraCatalog?.nombre || `Extra ${extra?.idExtra || '-'}`;
+                return `${nombreExtra} x ${extra?.cantidad || 1}`;
+              })
+              .join('\n')
+          : 'Sin extras';
+
+      const conductoresText =
+        reserva.conductores?.length > 0
+          ? reserva.conductores
+              .map((conductor) => {
+                const conductorCatalog = conductoresCatalog.find(
+                  (item) => String(item.id) === String(conductor?.idConductor)
+                );
+                const nombreConductor = conductorCatalog?.nombre || `Conductor ${conductor?.idConductor || '-'}`;
+                const rol = normalizeRolConductor(conductor?.rol) === 'PRI' ? 'Principal' : 'Secundario';
+                return `${nombreConductor} (${rol})`;
+              })
+              .join('\n')
+          : 'Sin conductores';
+
+      setSelectedReserva(reserva);
+      setModalState({
+        isOpen: true,
+        title: `Detalle reserva ${reserva.codigo || reserva.id || ''}`,
+        message: 'Informacion completa de la reserva.',
+        action: 'view',
+        targetId: null,
+        reason: '',
+        error: '',
+        detail: {
+          id: reserva.id || '-',
+          codigo: reserva.codigo || '-',
+          cliente: getClienteNombre(reserva.idCliente),
+          vehiculo: getVehiculoLabel(reserva.idVehiculo),
+          estado: reserva.estado || '-',
+          fechaInicio: formatDate(reserva.fechaInicio),
+          fechaFin: formatDate(reserva.fechaFin),
+          horaInicio: reserva.horaInicio || '-',
+          horaFin: reserva.horaFin || '-',
+          dias: reserva.cantidadDias || '-',
+          recogida: getLocalizacionNombre(reserva.idLocalizacionRecogida),
+          entrega: getLocalizacionNombre(reserva.idLocalizacionEntrega),
+          subtotal: formatMoney(reserva.subtotal),
+          iva: formatMoney(reserva.iva),
+          total: formatMoney(reserva.total),
+          descripcion: reserva.descripcion || '-',
+          motivoCancelacion: reserva.motivoCancelacion || '-',
+          extrasText,
+          conductoresText,
+        },
+      });
+      setStatusMessage('Detalle de reserva cargado.');
     } catch (error) {
       setErrorMessage(error.message || 'No se pudo obtener la reserva.');
     }
   };
 
   const handleConfirm = async (id) => {
-    try {
-      setErrorMessage('');
-      await confirmReserva(id);
-      setStatusMessage('Reserva confirmada correctamente.');
-      await loadReservas(filters);
-    } catch (error) {
-      setErrorMessage(error.message || 'No se pudo confirmar la reserva.');
+    const reserva = reservas.find((item) => String(item.id) === String(id));
+    if (!isReservaPendiente(reserva?.estado)) {
+      setErrorMessage('Solo se puede confirmar una reserva pendiente.');
+      return;
     }
+    openActionModal(
+      'confirm',
+      id,
+      'Confirmar reserva',
+      '¿Deseas confirmar esta reserva?'
+    );
   };
 
   const handleCancel = async (id) => {
-    const motivo = window.prompt('Ingresa el motivo de cancelacion:');
-
-    if (!motivo || !motivo.trim()) {
+    const reserva = reservas.find((item) => String(item.id) === String(id));
+    if (!isReservaPendiente(reserva?.estado)) {
+      setErrorMessage('Solo se puede cancelar una reserva pendiente.');
       return;
     }
-
-    try {
-      setErrorMessage('');
-      await cancelReserva(id, motivo.trim());
-      setStatusMessage('Reserva cancelada correctamente.');
-      await loadReservas(filters);
-    } catch (error) {
-      setErrorMessage(error.message || 'No se pudo cancelar la reserva.');
-    }
-  };
-
-  const handleSearchByCliente = async () => {
-    if (!filters.idCliente) {
-      await loadReservas(filters);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setErrorMessage('');
-      const response = await getReservasByCliente(Number(filters.idCliente));
-      const items = Array.isArray(response?.data) ? response.data.map(normalizeReserva) : [];
-      setReservas(items);
-      setTotal(items.length);
-      setPage(1);
-      setStatusMessage(items.length ? 'Reservas encontradas por cliente.' : 'No se encontraron resultados.');
-    } catch (error) {
-      setReservas([]);
-      setTotal(0);
-      setErrorMessage(error.message || 'No se pudo buscar por cliente.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSearchByVehiculo = async () => {
-    if (!filters.idVehiculo) {
-      await loadReservas(filters);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setErrorMessage('');
-      const response = await getReservasByVehiculo(Number(filters.idVehiculo));
-      const items = Array.isArray(response?.data) ? response.data.map(normalizeReserva) : [];
-      setReservas(items);
-      setTotal(items.length);
-      setPage(1);
-      setStatusMessage(items.length ? 'Reservas encontradas por vehiculo.' : 'No se encontraron resultados.');
-    } catch (error) {
-      setReservas([]);
-      setTotal(0);
-      setErrorMessage(error.message || 'No se pudo buscar por vehiculo.');
-    } finally {
-      setIsLoading(false);
-    }
+    openActionModal(
+      'cancel',
+      id,
+      'Cancelar reserva',
+      '¿Deseas cancelar esta reserva? Ingresa el motivo para continuar.'
+    );
   };
 
   const handleCheckAvailability = async () => {
@@ -532,10 +708,73 @@ function ReservasPage({ onBack }) {
     }
 
     try {
-      const response = await verifyDisponibilidadReserva(form.idVehiculo, form.fechaInicio, form.fechaFin);
-      setAvailabilityMessage(response?.data ? 'Vehiculo disponible.' : 'Vehiculo no disponible.');
+      const fechaInicio = buildDateTimeForAvailability(form.fechaInicio, form.horaInicio, false);
+      const fechaFin = buildDateTimeForAvailability(form.fechaFin, form.horaFin, true);
+      const response = await verifyDisponibilidadReserva(
+        Number(form.idVehiculo),
+        fechaInicio,
+        fechaFin
+      );
+      if (response?.data) {
+        setAvailabilityMessage('Vehiculo disponible.');
+        openInfoModal(
+          'Disponibilidad',
+          'Vehiculo disponible para el rango de fechas/horas seleccionado.'
+        );
+      } else {
+        setAvailabilityMessage('Vehiculo no disponible.');
+        openInfoModal('Disponibilidad', 'Vehiculo NO disponible para el rango seleccionado.');
+      }
     } catch (error) {
       setAvailabilityMessage(error.message || 'No se pudo verificar la disponibilidad.');
+      openInfoModal(
+        'Disponibilidad',
+        error.message || 'No se pudo verificar la disponibilidad.'
+      );
+    }
+  };
+
+  const handleModalConfirm = async () => {
+    if (modalState.action === 'info') {
+      closeModal();
+      return;
+    }
+
+    try {
+      setIsModalSubmitting(true);
+      setErrorMessage('');
+
+      if (modalState.action === 'confirm' && modalState.targetId) {
+        await confirmReserva(modalState.targetId);
+        setStatusMessage('Reserva confirmada correctamente.');
+        closeModal(true);
+        await loadReservas(filters);
+        return;
+      }
+
+      if (modalState.action === 'cancel' && modalState.targetId) {
+        if (!modalState.reason.trim()) {
+          setModalState((current) => ({
+            ...current,
+            error: 'El motivo de cancelacion es obligatorio.',
+          }));
+          return;
+        }
+
+        await cancelReserva(modalState.targetId, modalState.reason.trim());
+        setStatusMessage('Reserva cancelada correctamente.');
+        closeModal(true);
+        await loadReservas(filters);
+      }
+    } catch (error) {
+      setErrorMessage(
+        error.message ||
+          (modalState.action === 'confirm'
+            ? 'No se pudo confirmar la reserva.'
+            : 'No se pudo cancelar la reserva.')
+      );
+    } finally {
+      setIsModalSubmitting(false);
     }
   };
 
@@ -582,54 +821,29 @@ function ReservasPage({ onBack }) {
 
           <div className={styles.filterGrid}>
             <label className={styles.fieldCompact}>
-              <span>Cliente</span>
-              <select className={styles.select} name="idCliente" value={filters.idCliente} onChange={handleFilterChange}>
-                <option value="">Todos</option>
-                {clientes.map((cliente) => (
-                  <option key={cliente.id} value={cliente.id}>
-                    {cliente.nombre || `Cliente ${cliente.id}`}
-                  </option>
-                ))}
+              <span>Buscar por</span>
+              <select
+                className={styles.select}
+                name="campoBusqueda"
+                value={filters.campoBusqueda}
+                onChange={handleFilterChange}
+              >
+                <option value="codigoReserva">Codigo</option>
+                <option value="idCliente">ID cliente</option>
+                <option value="idVehiculo">ID vehiculo</option>
               </select>
             </label>
 
             <label className={styles.fieldCompact}>
-              <span>ID vehiculo</span>
-              <input className={styles.input} name="idVehiculo" type="number" min="1" value={filters.idVehiculo} onChange={handleFilterChange} />
-            </label>
-
-            <label className={styles.fieldCompact}>
-              <span>Recogida</span>
-              <select className={styles.select} name="idLocalizacionRecogida" value={filters.idLocalizacionRecogida} onChange={handleFilterChange}>
-                <option value="">Todas</option>
-                {localizaciones.map((localizacion) => (
-                  <option key={localizacion.id} value={localizacion.id}>
-                    {localizacion.nombre}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className={styles.fieldCompact}>
-              <span>Entrega</span>
-              <select className={styles.select} name="idLocalizacionEntrega" value={filters.idLocalizacionEntrega} onChange={handleFilterChange}>
-                <option value="">Todas</option>
-                {localizaciones.map((localizacion) => (
-                  <option key={localizacion.id} value={localizacion.id}>
-                    {localizacion.nombre}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className={styles.fieldCompact}>
-              <span>Codigo</span>
-              <input className={styles.input} name="codigoReserva" type="text" value={filters.codigoReserva} onChange={handleFilterChange} />
-            </label>
-
-            <label className={styles.fieldCompact}>
-              <span>Estado</span>
-              <input className={styles.input} name="estado" type="text" value={filters.estado} onChange={handleFilterChange} />
+              <span>Valor</span>
+              <input
+                className={styles.input}
+                name="valorBusqueda"
+                type="text"
+                value={filters.valorBusqueda}
+                placeholder={searchPlaceholder}
+                onChange={handleFilterChange}
+              />
             </label>
 
             <label className={styles.fieldCompact}>
@@ -665,13 +879,7 @@ function ReservasPage({ onBack }) {
 
           <div className={styles.searchRow}>
             <button className={styles.primaryButton} type="button" onClick={handleFilterSubmit}>
-              Buscar con filtros
-            </button>
-            <button className={styles.secondaryButton} type="button" onClick={handleSearchByCliente}>
-              Buscar por cliente
-            </button>
-            <button className={styles.secondaryButton} type="button" onClick={handleSearchByVehiculo}>
-              Buscar por vehiculo
+              Buscar
             </button>
             <button
               className={styles.secondaryButton}
@@ -713,33 +921,49 @@ function ReservasPage({ onBack }) {
                     <td>{reserva.id || '-'}</td>
                     <td>{reserva.codigo || '-'}</td>
                     <td>{getClienteNombre(reserva.idCliente)}</td>
-                    <td>{reserva.idVehiculo || '-'}</td>
+                    <td>{getVehiculoLabel(reserva.idVehiculo)}</td>
                     <td>
                       {formatDate(reserva.fechaInicio)} - {formatDate(reserva.fechaFin)}
                     </td>
                     <td>{formatMoney(reserva.total)}</td>
                     <td>
-                      <span
-                        className={`${styles.badge} ${
-                          reserva.estado === 'CONFIRMADA' || reserva.estado === 'ACT'
+                      {(() => {
+                        const estado = String(reserva.estado || '').trim().toUpperCase();
+                        const badgeClass =
+                          estado === 'CON' || estado === 'CONFIRMADA' || estado === 'ACT'
                             ? styles.badgeActive
-                            : styles.badgeInactive
-                        }`}
-                      >
-                        {reserva.estado || '-'}
-                      </span>
+                            : estado === 'PEN' || estado === 'PENDIENTE'
+                              ? styles.badgeWarning
+                              : estado === 'CAN' || estado === 'CANCELADA'
+                                ? styles.badgeInactive
+                                : styles.badgeInactive;
+
+                        return (
+                          <span className={`${styles.badge} ${badgeClass}`}>
+                            {reserva.estado || '-'}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td>
                       <div className={styles.actions}>
-                        <button className={styles.linkButton} type="button" onClick={() => handleEdit(reserva.id)}>
-                          Editar
-                        </button>
-                        <button className={styles.linkButton} type="button" onClick={() => handleConfirm(reserva.id)}>
-                          Confirmar
-                        </button>
-                        <button className={styles.linkDanger} type="button" onClick={() => handleCancel(reserva.id)}>
-                          Cancelar
-                        </button>
+                        {isReservaPendiente(reserva.estado) ? (
+                          <>
+                            <button className={styles.linkButton} type="button" onClick={() => handleEdit(reserva.id)}>
+                              Editar
+                            </button>
+                            <button className={styles.linkButton} type="button" onClick={() => handleConfirm(reserva.id)}>
+                              Confirmar
+                            </button>
+                            <button className={styles.linkDanger} type="button" onClick={() => handleCancel(reserva.id)}>
+                              Cancelar
+                            </button>
+                          </>
+                        ) : isReservaBloqueada(reserva.estado) ? (
+                          <button className={styles.linkButton} type="button" onClick={() => handleView(reserva.id)}>
+                            Ver
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -774,7 +998,7 @@ function ReservasPage({ onBack }) {
           <form className={styles.form} onSubmit={handleSubmit}>
             <label className={styles.field}>
               <span>Cliente</span>
-              <select className={styles.select} name="idCliente" value={form.idCliente} onChange={handleFormChange} disabled={Boolean(editingId)}>
+              <select className={styles.select} name="idCliente" value={form.idCliente} onChange={handleFormChange}>
                 <option value="">Selecciona un cliente</option>
                 {clientes.map((cliente) => (
                   <option key={cliente.id} value={cliente.id}>
@@ -786,13 +1010,25 @@ function ReservasPage({ onBack }) {
 
             <div className={styles.twoColumns}>
               <label className={styles.field}>
-                <span>ID vehiculo</span>
-                <input className={styles.input} name="idVehiculo" type="number" min="1" value={form.idVehiculo} onChange={handleFormChange} disabled={Boolean(editingId)} />
+                <span>Vehiculo</span>
+                <select
+                  className={styles.select}
+                  name="idVehiculo"
+                  value={form.idVehiculo}
+                  onChange={handleFormChange}
+                >
+                  <option value="">Selecciona un vehiculo disponible</option>
+                  {vehiculosDisponibles.map((vehiculo) => (
+                    <option key={vehiculo.id} value={vehiculo.id}>
+                      {`${vehiculo.placa || `Vehiculo ${vehiculo.id}`} ${vehiculo.modelo || ''}`.trim()}
+                    </option>
+                  ))}
+                </select>
               </label>
 
               <label className={styles.field}>
                 <span>Cantidad de dias</span>
-                <input className={styles.input} name="cantidadDias" type="number" min="1" value={form.cantidadDias} onChange={handleFormChange} disabled={Boolean(editingId)} />
+                <input className={styles.input} name="cantidadDias" type="number" min="1" value={form.cantidadDias} onChange={handleFormChange} />
               </label>
             </div>
 
@@ -823,8 +1059,14 @@ function ReservasPage({ onBack }) {
             <div className={styles.twoColumns}>
               <label className={styles.field}>
                 <span>Localizacion recogida</span>
-                <select className={styles.select} name="idLocalizacionRecogida" value={form.idLocalizacionRecogida} onChange={handleFormChange}>
-                  <option value="">Selecciona</option>
+                <select
+                  className={styles.select}
+                  name="idLocalizacionRecogida"
+                  value={form.idLocalizacionRecogida}
+                  onChange={handleFormChange}
+                  disabled
+                >
+                  <option value="">Selecciona un vehiculo primero</option>
                   {localizaciones.map((localizacion) => (
                     <option key={localizacion.id} value={localizacion.id}>
                       {localizacion.nombre}
@@ -961,8 +1203,8 @@ function ReservasPage({ onBack }) {
                           value={conductor.rol}
                           onChange={(event) => updateConductorRow(index, 'rol', event.target.value)}
                         >
-                          <option value="TITULAR">Titular</option>
-                          <option value="SECUNDARIO">Secundario</option>
+                          <option value="PRI">Principal</option>
+                          <option value="SEC">Secundario</option>
                         </select>
                       </label>
                     </div>
@@ -1050,6 +1292,113 @@ function ReservasPage({ onBack }) {
           ) : null}
         </section>
       </div>
+
+      {modalState.isOpen ? (
+        <>
+          <div
+            className="modal fade show"
+            style={{ display: 'block' }}
+            tabIndex="-1"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => closeModal()}
+          >
+            <div
+              className="modal-dialog modal-dialog-centered"
+              role="document"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">{modalState.title}</h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    aria-label="Cerrar"
+                    onClick={closeModal}
+                    disabled={isModalSubmitting}
+                  />
+                </div>
+                <div className="modal-body">
+                  <p className="mb-2">{modalState.message}</p>
+                  {modalState.action === 'view' && modalState.detail ? (
+                    <div className="small">
+                      <p className="mb-1"><strong>ID:</strong> {modalState.detail.id}</p>
+                      <p className="mb-1"><strong>Codigo:</strong> {modalState.detail.codigo}</p>
+                      <p className="mb-1"><strong>Cliente:</strong> {modalState.detail.cliente}</p>
+                      <p className="mb-1"><strong>Vehiculo:</strong> {modalState.detail.vehiculo}</p>
+                      <p className="mb-1"><strong>Estado:</strong> {modalState.detail.estado}</p>
+                      <p className="mb-1"><strong>Fechas:</strong> {modalState.detail.fechaInicio} - {modalState.detail.fechaFin}</p>
+                      <p className="mb-1"><strong>Horas:</strong> {modalState.detail.horaInicio} - {modalState.detail.horaFin}</p>
+                      <p className="mb-1"><strong>Dias:</strong> {modalState.detail.dias}</p>
+                      <p className="mb-1"><strong>Recogida:</strong> {modalState.detail.recogida}</p>
+                      <p className="mb-1"><strong>Entrega:</strong> {modalState.detail.entrega}</p>
+                      <p className="mb-1"><strong>Subtotal:</strong> {modalState.detail.subtotal}</p>
+                      <p className="mb-1"><strong>IVA:</strong> {modalState.detail.iva}</p>
+                      <p className="mb-1"><strong>Total:</strong> {modalState.detail.total}</p>
+                      <p className="mb-1"><strong>Descripcion:</strong> {modalState.detail.descripcion}</p>
+                      <p className="mb-1"><strong>Motivo cancelacion:</strong> {modalState.detail.motivoCancelacion}</p>
+                      <p className="mb-1"><strong>Extras:</strong></p>
+                      <pre className="bg-light p-2 border rounded">{modalState.detail.extrasText}</pre>
+                      <p className="mb-1"><strong>Conductores:</strong></p>
+                      <pre className="bg-light p-2 border rounded">{modalState.detail.conductoresText}</pre>
+                    </div>
+                  ) : null}
+                  {modalState.action === 'cancel' ? (
+                    <div className="mt-2">
+                      <label className="form-label" htmlFor="cancel-reason">
+                        Motivo de cancelacion
+                      </label>
+                      <textarea
+                        id="cancel-reason"
+                        className="form-control"
+                        rows="3"
+                        value={modalState.reason}
+                        onChange={(event) =>
+                          setModalState((current) => ({
+                            ...current,
+                            reason: event.target.value,
+                            error: '',
+                          }))
+                        }
+                        disabled={isModalSubmitting}
+                      />
+                    </div>
+                  ) : null}
+                  {modalState.error ? (
+                    <div className="text-danger mt-2">{modalState.error}</div>
+                  ) : null}
+                </div>
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => closeModal()}
+                    disabled={isModalSubmitting}
+                  >
+                    Cerrar
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn ${modalState.action === 'cancel' ? 'btn-danger' : 'btn-primary'}`}
+                    onClick={handleModalConfirm}
+                    disabled={isModalSubmitting || modalState.action === 'view'}
+                  >
+                    {isModalSubmitting
+                      ? 'Procesando...'
+                      : modalState.action === 'confirm'
+                        ? 'Confirmar'
+                        : modalState.action === 'cancel'
+                          ? 'Cancelar reserva'
+                          : 'Aceptar'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show" />
+        </>
+      ) : null}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import CategoriasPage from '../Categorias/CategoriasPage';
 import ClientesPage from '../Clientes/ClientesPage';
 import CiudadesPage from '../Ciudades/CiudadesPage';
@@ -10,26 +10,35 @@ import MarcasPage from '../Marcas/MarcasPage';
 import PaisesPage from '../Paises/PaisesPage';
 import ReservasPage from '../Reservas/ReservasPage';
 import VehiculosPage from '../Vehiculos/VehiculosPage';
+import { listClientes, listReservas, listVehiculos } from '../../api/services/api';
 import styles from './AdminPage.module.css';
 
 const modules = [
-  { key: 'dashboard', title: 'Dashboard', description: 'Resumen general del sistema' },
-  { key: 'paises', title: 'Paises', description: 'Catalogo de paises y mantenimiento' },
-  { key: 'ciudades', title: 'Ciudades', description: 'Catalogo de ciudades por pais' },
-  { key: 'marcas', title: 'Marcas', description: 'Catalogo de marcas de vehiculos' },
-  { key: 'categorias', title: 'Categorias', description: 'Catalogo base para clasificar vehiculos' },
-  { key: 'vehiculos', title: 'Vehiculos', description: 'Inventario, disponibilidad, kilometraje y estado' },
-  { key: 'extras', title: 'Extras', description: 'Servicios complementarios y precios' },
-  { key: 'localizaciones', title: 'Localizaciones', description: 'Sucursales, contacto y horarios por ciudad' },
-  { key: 'clientes', title: 'Clientes', description: 'Clientes, identificacion y ciudad' },
-  { key: 'conductores', title: 'Conductores', description: 'Licencias, edad y datos de contacto' },
-  { key: 'reservas', title: 'Reservas', description: 'Reservas con extras, conductores y disponibilidad' },
-  { key: 'facturas', title: 'Facturas', description: 'Facturacion por reserva, aprobacion y anulacion' },
-  { key: 'auditoria', title: 'Auditoria', description: 'Pendiente de implementacion' },
+  { key: 'dashboard', title: 'Dashboard', emoji: '📊', description: 'Resumen general del sistema' },
+  { key: 'paises', title: 'Paises', emoji: '🌎', description: 'Catalogo de paises y mantenimiento' },
+  { key: 'ciudades', title: 'Ciudades', emoji: '🏙️', description: 'Catalogo de ciudades por pais' },
+  { key: 'marcas', title: 'Marcas', emoji: '🏷️', description: 'Catalogo de marcas de vehiculos' },
+  { key: 'categorias', title: 'Categorias', emoji: '🗂️', description: 'Catalogo base para clasificar vehiculos' },
+  { key: 'vehiculos', title: 'Vehiculos', emoji: '🚗', description: 'Inventario, disponibilidad, kilometraje y estado' },
+  { key: 'extras', title: 'Extras', emoji: '✨', description: 'Servicios complementarios y precios' },
+  { key: 'localizaciones', title: 'Localizaciones', emoji: '📍', description: 'Sucursales, contacto y horarios por ciudad' },
+  { key: 'clientes', title: 'Clientes', emoji: '👤', description: 'Clientes, identificacion y ciudad' },
+  { key: 'conductores', title: 'Conductores', emoji: '🪪', description: 'Licencias, edad y datos de contacto' },
+  { key: 'reservas', title: 'Reservas', emoji: '📅', description: 'Reservas con extras, conductores y disponibilidad' },
+  { key: 'facturas', title: 'Facturas', emoji: '🧾', description: 'Facturacion por reserva, aprobacion y anulacion' },
 ];
 
 function AdminPage({ session, onLogout }) {
   const [activeModule, setActiveModule] = useState('dashboard');
+  const [hasLogoError, setHasLogoError] = useState(false);
+  const [dashboardStats, setDashboardStats] = useState({
+    clientes: 0,
+    vehiculos: 0,
+    reservas: 0,
+  });
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
+  const [statsError, setStatsError] = useState('');
+  const logoSrc = '/logoBudgetCar.png';
 
   const userLabel = useMemo(() => {
     return (
@@ -41,37 +50,70 @@ function AdminPage({ session, onLogout }) {
     );
   }, [session]);
 
+  const activeModuleLabel = useMemo(
+    () => modules.find((module) => module.key === activeModule)?.title || 'Dashboard',
+    [activeModule]
+  );
+
+  const loadDashboardStats = async () => {
+    try {
+      setIsLoadingStats(true);
+      setStatsError('');
+      const [clientesResponse, vehiculosResponse, reservasResponse] = await Promise.all([
+        listClientes(),
+        listVehiculos(),
+        listReservas(),
+      ]);
+      setDashboardStats({
+        clientes: Array.isArray(clientesResponse?.data) ? clientesResponse.data.length : 0,
+        vehiculos: Array.isArray(vehiculosResponse?.data) ? vehiculosResponse.data.length : 0,
+        reservas: Array.isArray(reservasResponse?.data) ? reservasResponse.data.length : 0,
+      });
+    } catch (error) {
+      setStatsError(error.message || 'No se pudieron cargar los indicadores del dashboard.');
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeModule === 'dashboard') {
+      loadDashboardStats();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeModule]);
+
   const renderContent = () => {
     if (activeModule === 'dashboard') {
       return (
-        <>
-          <section className={styles.gridSection}>
-            {modules
-              .filter((module) => module.key !== 'dashboard')
-              .map((module) => (
-                <button
-                  key={module.key}
-                  type="button"
-                  className={styles.moduleCard}
-                  onClick={() => setActiveModule(module.key)}
-                >
-                  <strong>{module.title}</strong>
-                  <span>{module.description}</span>
-                </button>
-              ))}
-          </section>
-
-          <section className={styles.contentSection}>
-            <div className={styles.placeholderPanel}>
-              <h2>Administracion Budget Car</h2>
-              <p>
-                Selecciona un modulo para abrirlo en una vista separada. Ya estan listos
-                Paises, Ciudades, Marcas, Categorias, Extras, Clientes y Conductores
-                conectados al backend.
-              </p>
+        <div className={styles.dashboardWrap}>
+          <div className={styles.summaryHeader}>
+            <div>
+              <p className={styles.summaryKicker}>Resumen general</p>
+              <h2 className={styles.summaryTitle}>Dashboard</h2>
             </div>
+            <button className={styles.refreshButton} type="button" onClick={loadDashboardStats} disabled={isLoadingStats}>
+              {isLoadingStats ? 'Actualizando...' : 'Actualizar'}
+            </button>
+          </div>
+
+          {statsError ? <div className={styles.statsError}>{statsError}</div> : null}
+
+          <section className={styles.statsGrid}>
+            <article className={styles.statCard}>
+              <span className={styles.statLabel}>👤 Clientes</span>
+              <strong className={styles.statValue}>{dashboardStats.clientes}</strong>
+            </article>
+            <article className={styles.statCard}>
+              <span className={styles.statLabel}>🚗 Vehiculos</span>
+              <strong className={styles.statValue}>{dashboardStats.vehiculos}</strong>
+            </article>
+            <article className={styles.statCard}>
+              <span className={styles.statLabel}>📅 Reservas</span>
+              <strong className={styles.statValue}>{dashboardStats.reservas}</strong>
+            </article>
           </section>
-        </>
+        </div>
       );
     }
 
@@ -134,21 +176,65 @@ function AdminPage({ session, onLogout }) {
 
   return (
     <div className={styles.adminPage}>
-      <header className={styles.header}>
-        <div>
-          <p className={styles.kicker}>Panel de administracion</p>
-          <h1 className={styles.brand}>Budget Car</h1>
+      <aside className={styles.sidebar}>
+        <div className={styles.brandBlock}>
+          <img
+            className={styles.logoImage}
+            src={logoSrc}
+            alt="Budget Car logo"
+            onError={() => setHasLogoError(true)}
+          />
+          <div className={styles.logoInfoBox}>
+            <p className={styles.logoInfoTitle}>Estado del sistema</p>
+            <p className={styles.logoInfoText}>
+              {hasLogoError
+                ? 'Tu mejor opcion para alquiler de autos, rapido y seguro.'
+                : 'Alquila tu auto ideal al mejor precio: rapido, confiable y sin complicaciones.'}
+            </p>
+          </div>
+          <div className={styles.brandText}>
+            <p className={styles.kicker}>Panel administrativo</p>
+            <h1 className={styles.brand}>Budget Car</h1>
+          </div>
         </div>
 
-        <div className={styles.headerActions}>
-          <span className={styles.userBadge}>{userLabel}</span>
-          <button className={styles.logoutButton} type="button" onClick={onLogout}>
-            Cerrar sesion
-          </button>
-        </div>
-      </header>
+        <nav className={styles.sidebarNav}>
+          {modules.map((module) => {
+            const isActive = module.key === activeModule;
+            return (
+              <button
+                key={module.key}
+                type="button"
+                className={`${styles.navItem} ${isActive ? styles.navItemActive : ''}`}
+                onClick={() => setActiveModule(module.key)}
+              >
+                <span className={styles.moduleEmoji} aria-hidden="true">
+                  {module.emoji || '📌'}
+                </span>
+                <span>{module.title}</span>
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
 
-      {renderContent()}
+      <main className={styles.mainPanel}>
+        <header className={styles.header}>
+          <div>
+            <p className={styles.kicker}>Sesion activa</p>
+            <h2 className={styles.mainTitle}>{userLabel}</h2>
+          </div>
+
+          <div className={styles.headerActions}>
+            <span className={styles.userBadge}>Modulo: {activeModuleLabel}</span>
+            <button className={styles.logoutButton} type="button" onClick={onLogout}>
+              Salir
+            </button>
+          </div>
+        </header>
+
+        <section className={styles.contentSection}>{renderContent()}</section>
+      </main>
     </div>
   );
 }

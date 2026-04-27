@@ -4,18 +4,12 @@ import {
   deleteVehiculo,
   existsVehiculoPlaca,
   getVehiculoById,
-  getVehiculoByPlaca,
-  getVehiculosByCategoria,
-  getVehiculosByMarca,
-  getVehiculosByPrecio,
-  getVehiculosDisponibles,
   listCategorias,
+  listVehiculos,
   listLocalizaciones,
   listMarcas,
   searchVehiculos,
   updateVehiculo,
-  updateVehiculoEstado,
-  updateVehiculoKilometraje,
 } from '../../api/services/api';
 import styles from '../shared/CrudPage.module.css';
 
@@ -26,7 +20,7 @@ const initialForm = {
   idLocalizacion: '',
   modelo: '',
   anioFabricacion: '',
-  color: '',
+  color: 'BLANCO',
   tipoCombustible: 'GASOLINA',
   tipoTransmision: 'AUTOMATICA',
   capacidadPasajeros: '',
@@ -37,46 +31,54 @@ const initialForm = {
   aireAcondicionado: 'true',
   precioBaseDia: '',
   imagenUrl: '',
-  estado: 'ACT',
 };
 
+const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dttpkxxxw/image/upload';
+const CLOUDINARY_UPLOAD_PRESET = 'budgetcar_imagenes';
+
 const initialFilters = {
+  campoBusqueda: 'placa',
+  valorBusqueda: '',
   idMarca: '',
   idCategoria: '',
   idLocalizacion: '',
-  precioMin: '',
-  precioMax: '',
-  fechaInicio: '',
-  fechaFin: '',
-  estado: '',
-  tipoTransmision: '',
-  tipoCombustible: '',
-  capacidadMinPasajeros: '',
-  aireAcondicionado: '',
-  modelo: '',
-  placa: '',
   pagina: 1,
   tamano: 10,
 };
 
+const colorOptions = [
+  'BLANCO',
+  'NEGRO',
+  'GRIS',
+  'PLATEADO',
+  'AZUL',
+  'ROJO',
+  'VERDE',
+  'AMARILLO',
+  'CAFE',
+  'NARANJA',
+];
+
 function normalizeMarca(item) {
   return {
-    id: item?.id ?? '',
-    nombre: item?.nombre ?? item?.nombreMarca ?? '',
+    id: item?.id ?? item?.Id ?? item?.idMarca ?? item?.IdMarca ?? '',
+    nombre: item?.nombre ?? item?.Nombre ?? item?.nombreMarca ?? item?.NombreMarca ?? '',
   };
 }
 
 function normalizeCategoria(item) {
   return {
-    id: item?.id ?? '',
-    nombre: item?.nombre ?? item?.nombreCategoria ?? '',
+    id: item?.id ?? item?.Id ?? item?.idCategoria ?? item?.IdCategoria ?? '',
+    nombre:
+      item?.nombre ?? item?.Nombre ?? item?.nombreCategoria ?? item?.NombreCategoria ?? '',
   };
 }
 
 function normalizeLocalizacion(item) {
   return {
-    id: item?.id ?? '',
-    nombre: item?.nombre ?? '',
+    id: item?.id ?? item?.Id ?? item?.idLocalizacion ?? item?.IdLocalizacion ?? '',
+    nombre:
+      item?.nombre ?? item?.Nombre ?? item?.nombreLocalizacion ?? item?.NombreLocalizacion ?? '',
   };
 }
 
@@ -86,22 +88,22 @@ function normalizeVehiculo(item) {
     guid: item?.guid ?? '',
     codigoInterno: item?.codigoInterno ?? '',
     placa: item?.placa ?? '',
-    idMarca: item?.idMarca ?? '',
-    idCategoria: item?.idCategoria ?? '',
-    idLocalizacion: item?.idLocalizacion ?? '',
+    idMarca: item?.idMarca ?? item?.IdMarca ?? '',
+    idCategoria: item?.idCategoria ?? item?.IdCategoria ?? '',
+    idLocalizacion: item?.idLocalizacion ?? item?.IdLocalizacion ?? '',
     modelo: item?.modelo ?? '',
-    anioFabricacion: item?.anioFabricacion ?? '',
+    anioFabricacion: item?.anioFabricacion ?? item?.AnioFabricacion ?? '',
     color: item?.color ?? '',
-    tipoCombustible: item?.tipoCombustible ?? '',
-    tipoTransmision: item?.tipoTransmision ?? '',
-    capacidadPasajeros: item?.capacidadPasajeros ?? '',
-    capacidadMaletas: item?.capacidadMaletas ?? '',
-    numeroPuertas: item?.numeroPuertas ?? '',
+    tipoCombustible: item?.tipoCombustible ?? item?.TipoCombustible ?? '',
+    tipoTransmision: item?.tipoTransmision ?? item?.TipoTransmision ?? '',
+    capacidadPasajeros: item?.capacidadPasajeros ?? item?.CapacidadPasajeros ?? '',
+    capacidadMaletas: item?.capacidadMaletas ?? item?.CapacidadMaletas ?? '',
+    numeroPuertas: item?.numeroPuertas ?? item?.NumeroPuertas ?? '',
     aireAcondicionado: Boolean(item?.aireAcondicionado),
-    precioBaseDia: Number(item?.precioBaseDia ?? 0),
-    kilometrajeActual: item?.kilometrajeActual ?? 0,
+    precioBaseDia: Number(item?.precioBaseDia ?? item?.PrecioBaseDia ?? 0),
+    kilometrajeActual: item?.kilometrajeActual ?? item?.KilometrajeActual ?? 0,
     observaciones: item?.observaciones ?? '',
-    imagenUrl: item?.imagenUrl ?? '',
+    imagenUrl: item?.imagenUrl ?? item?.ImagenUrl ?? '',
     estado: item?.estado ?? '',
   };
 }
@@ -151,25 +153,18 @@ function extractItem(response) {
 }
 
 function buildFiltersPayload(filters) {
+  const searchValue = filters.valorBusqueda.trim();
+  const searchField = filters.campoBusqueda;
+  const idMarca = Number(filters.idMarca);
+  const idCategoria = Number(filters.idCategoria);
+  const idLocalizacion = Number(filters.idLocalizacion);
+
   return {
-    ...(filters.idMarca ? { idMarca: Number(filters.idMarca) } : {}),
-    ...(filters.idCategoria ? { idCategoria: Number(filters.idCategoria) } : {}),
-    ...(filters.idLocalizacion ? { idLocalizacion: Number(filters.idLocalizacion) } : {}),
-    ...(filters.precioMin !== '' ? { precioMin: Number(filters.precioMin) } : {}),
-    ...(filters.precioMax !== '' ? { precioMax: Number(filters.precioMax) } : {}),
-    ...(filters.fechaInicio ? { fechaInicio: filters.fechaInicio } : {}),
-    ...(filters.fechaFin ? { fechaFin: filters.fechaFin } : {}),
-    ...(filters.estado ? { estado: filters.estado } : {}),
-    ...(filters.tipoTransmision ? { tipoTransmision: filters.tipoTransmision } : {}),
-    ...(filters.tipoCombustible ? { tipoCombustible: filters.tipoCombustible } : {}),
-    ...(filters.capacidadMinPasajeros !== ''
-      ? { capacidadMinPasajeros: Number(filters.capacidadMinPasajeros) }
-      : {}),
-    ...(filters.aireAcondicionado !== ''
-      ? { aireAcondicionado: filters.aireAcondicionado === 'true' }
-      : {}),
-    ...(filters.modelo.trim() ? { modelo: filters.modelo.trim() } : {}),
-    ...(filters.placa.trim() ? { placa: filters.placa.trim() } : {}),
+    ...(Number.isFinite(idMarca) && idMarca > 0 ? { idMarca } : {}),
+    ...(Number.isFinite(idCategoria) && idCategoria > 0 ? { idCategoria } : {}),
+    ...(Number.isFinite(idLocalizacion) && idLocalizacion > 0 ? { idLocalizacion } : {}),
+    ...(searchValue && searchField === 'placa' ? { placa: searchValue } : {}),
+    ...(searchValue && searchField === 'modelo' ? { modelo: searchValue } : {}),
     pagina: Number(filters.pagina) || 1,
     tamano: Number(filters.tamano) || 10,
   };
@@ -198,9 +193,16 @@ function VehiculosPage({ onBack }) {
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedImageFile, setSelectedImageFile] = useState(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState('');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const formTitle = useMemo(() => (editingId ? 'Editar vehiculo' : 'Crear vehiculo'), [editingId]);
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize || 1)), [pageSize, total]);
+  const searchPlaceholder = useMemo(
+    () => (filters.campoBusqueda === 'modelo' ? 'Buscar por modelo' : 'Buscar por placa'),
+    [filters.campoBusqueda]
+  );
 
   const getMarcaNombre = (idMarca) =>
     marcas.find((marca) => String(marca.id) === String(idMarca))?.nombre || '-';
@@ -258,6 +260,8 @@ function VehiculosPage({ onBack }) {
   const resetForm = () => {
     setForm(initialForm);
     setEditingId(null);
+    setSelectedImageFile(null);
+    setImagePreviewUrl('');
   };
 
   const handleFormChange = (event) => {
@@ -273,7 +277,76 @@ function VehiculosPage({ onBack }) {
     setFilters((currentFilters) => ({
       ...currentFilters,
       [name]: value,
+      ...(name !== 'pagina' ? { pagina: 1 } : {}),
     }));
+  };
+
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0] || null;
+    setSelectedImageFile(file);
+    setImagePreviewUrl(file ? URL.createObjectURL(file) : '');
+  };
+
+  const extractCloudinaryPublicId = (url) => {
+    const value = String(url || '').trim();
+    if (!value) {
+      return '';
+    }
+
+    const match = value.match(/\/upload\/(?:v\d+\/)?(.+)\.[a-zA-Z0-9]+(?:\?.*)?$/);
+    return match?.[1] ? decodeURIComponent(match[1]) : '';
+  };
+
+  const buildCloudinaryPublicId = (placa) => {
+    const normalizedPlaca = String(placa || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9_-]/g, '-');
+    return normalizedPlaca ? `budget-car/vehiculos/${normalizedPlaca}` : '';
+  };
+
+  const uploadImageToCloudinary = async (file, options = {}) => {
+    const { existingImageUrl = '', placa = '' } = options;
+    const sendUploadRequest = async (publicId = '') => {
+      const body = new FormData();
+      body.append('file', file);
+      body.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+      if (publicId) {
+        body.append('public_id', publicId);
+      }
+
+      const response = await fetch(CLOUDINARY_UPLOAD_URL, {
+        method: 'POST',
+        body,
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.error?.message || 'No se pudo subir la imagen a Cloudinary.');
+      }
+
+      if (!payload?.secure_url) {
+        throw new Error('Cloudinary no devolvio secure_url para la imagen.');
+      }
+
+      return payload.secure_url;
+    };
+
+    const preferredPublicId = extractCloudinaryPublicId(existingImageUrl) || buildCloudinaryPublicId(placa);
+
+    if (!preferredPublicId) {
+      return sendUploadRequest();
+    }
+
+    try {
+      // En unsigned upload no se permite overwrite; intentamos reutilizar public_id.
+      return await sendUploadRequest(preferredPublicId);
+    } catch (error) {
+      // Si Cloudinary rechaza por conflicto/config, volvemos al comportamiento anterior.
+      return sendUploadRequest();
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -296,6 +369,10 @@ function VehiculosPage({ onBack }) {
       setErrorMessage('Completa los campos obligatorios del vehiculo.');
       return;
     }
+    if (!editingId && !selectedImageFile) {
+      setErrorMessage('Selecciona una imagen del vehiculo.');
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -306,6 +383,15 @@ function VehiculosPage({ onBack }) {
       if (!editingId && existsResponse?.data) {
         setErrorMessage('Ya existe un vehiculo con esa placa.');
         return;
+      }
+
+      let imagenUrl = form.imagenUrl.trim() || null;
+      if (selectedImageFile) {
+        setIsUploadingImage(true);
+        imagenUrl = await uploadImageToCloudinary(selectedImageFile, {
+          existingImageUrl: editingId ? form.imagenUrl : '',
+          placa: form.placa,
+        });
       }
 
       const payload = {
@@ -325,8 +411,7 @@ function VehiculosPage({ onBack }) {
         kilometrajeActual: Number(form.kilometrajeActual),
         aireAcondicionado: form.aireAcondicionado === 'true',
         precioBaseDia: Number(form.precioBaseDia),
-        imagenUrl: form.imagenUrl.trim() || null,
-        ...(editingId ? { estado: form.estado } : {}),
+        imagenUrl,
       };
 
       if (editingId) {
@@ -344,6 +429,7 @@ function VehiculosPage({ onBack }) {
     } catch (error) {
       setErrorMessage(error.message || 'No se pudo guardar el vehiculo.');
     } finally {
+      setIsUploadingImage(false);
       setIsSubmitting(false);
     }
   };
@@ -361,6 +447,8 @@ function VehiculosPage({ onBack }) {
 
       setSelectedVehiculo(vehiculo);
       setEditingId(vehiculo.id);
+      setSelectedImageFile(null);
+      setImagePreviewUrl('');
       setForm({
         placa: vehiculo.placa || '',
         idMarca: vehiculo.idMarca ? String(vehiculo.idMarca) : '',
@@ -379,7 +467,6 @@ function VehiculosPage({ onBack }) {
         aireAcondicionado: vehiculo.aireAcondicionado ? 'true' : 'false',
         precioBaseDia: String(vehiculo.precioBaseDia ?? ''),
         imagenUrl: vehiculo.imagenUrl || '',
-        estado: vehiculo.estado || 'ACT',
       });
       setStatusMessage('Vehiculo cargado para edicion.');
     } catch (error) {
@@ -407,165 +494,57 @@ function VehiculosPage({ onBack }) {
     }
   };
 
-  const handleSearchByPlaca = async () => {
-    if (!filters.placa.trim()) {
-      await loadVehiculos(filters);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setErrorMessage('');
-      const response = await getVehiculoByPlaca(filters.placa.trim());
-      const vehiculo = response?.data ? normalizeVehiculo(response.data) : null;
-      setVehiculos(vehiculo ? [vehiculo] : []);
-      setTotal(vehiculo ? 1 : 0);
-      setPage(1);
-      setStatusMessage(vehiculo ? 'Vehiculo encontrado.' : 'No se encontraron resultados.');
-    } catch (error) {
-      setVehiculos([]);
-      setTotal(0);
-      setErrorMessage(error.message || 'No se pudo buscar por placa.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSearchByMarca = async () => {
-    if (!filters.idMarca) {
-      await loadVehiculos(filters);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setErrorMessage('');
-      const response = await getVehiculosByMarca(Number(filters.idMarca));
-      const items = Array.isArray(response?.data) ? response.data.map(normalizeVehiculo) : [];
-      setVehiculos(items);
-      setTotal(items.length);
-      setPage(1);
-      setStatusMessage(items.length ? 'Vehiculos encontrados por marca.' : 'No se encontraron resultados.');
-    } catch (error) {
-      setVehiculos([]);
-      setTotal(0);
-      setErrorMessage(error.message || 'No se pudo buscar por marca.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSearchByCategoria = async () => {
-    if (!filters.idCategoria) {
-      await loadVehiculos(filters);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setErrorMessage('');
-      const response = await getVehiculosByCategoria(Number(filters.idCategoria));
-      const items = Array.isArray(response?.data) ? response.data.map(normalizeVehiculo) : [];
-      setVehiculos(items);
-      setTotal(items.length);
-      setPage(1);
-      setStatusMessage(items.length ? 'Vehiculos encontrados por categoria.' : 'No se encontraron resultados.');
-    } catch (error) {
-      setVehiculos([]);
-      setTotal(0);
-      setErrorMessage(error.message || 'No se pudo buscar por categoria.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSearchByPrecio = async () => {
-    if (filters.precioMin === '' || filters.precioMax === '') {
-      setErrorMessage('Ingresa precio minimo y maximo para esta busqueda.');
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setErrorMessage('');
-      const response = await getVehiculosByPrecio(filters.precioMin, filters.precioMax);
-      const items = Array.isArray(response?.data) ? response.data.map(normalizeVehiculo) : [];
-      setVehiculos(items);
-      setTotal(items.length);
-      setPage(1);
-      setStatusMessage(items.length ? 'Vehiculos encontrados por precio.' : 'No se encontraron resultados.');
-    } catch (error) {
-      setVehiculos([]);
-      setTotal(0);
-      setErrorMessage(error.message || 'No se pudo buscar por precio.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSearchDisponibles = async () => {
-    try {
-      setIsLoading(true);
-      setErrorMessage('');
-      const response = await getVehiculosDisponibles();
-      const items = Array.isArray(response?.data) ? response.data.map(normalizeVehiculo) : [];
-      setVehiculos(items);
-      setTotal(items.length);
-      setPage(1);
-      setStatusMessage(items.length ? 'Vehiculos disponibles cargados.' : 'No hay vehiculos disponibles.');
-    } catch (error) {
-      setVehiculos([]);
-      setTotal(0);
-      setErrorMessage(error.message || 'No se pudieron cargar los vehiculos disponibles.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleUpdateKilometraje = async (vehiculo) => {
-    const value = window.prompt('Nuevo kilometraje:', String(vehiculo.kilometrajeActual ?? ''));
-
-    if (value === null || value.trim() === '') {
-      return;
-    }
-
-    try {
-      setErrorMessage('');
-      await updateVehiculoKilometraje(vehiculo.id, Number(value));
-      setStatusMessage('Kilometraje actualizado correctamente.');
-      await loadVehiculos(filters);
-    } catch (error) {
-      setErrorMessage(error.message || 'No se pudo actualizar el kilometraje.');
-    }
-  };
-
-  const handleUpdateEstado = async (vehiculo) => {
-    const value = window.prompt('Nuevo estado:', vehiculo.estado || '');
-
-    if (value === null || !value.trim()) {
-      return;
-    }
-
-    try {
-      setErrorMessage('');
-      await updateVehiculoEstado(vehiculo.id, value.trim());
-      setStatusMessage('Estado actualizado correctamente.');
-      await loadVehiculos(filters);
-    } catch (error) {
-      setErrorMessage(error.message || 'No se pudo actualizar el estado.');
-    }
-  };
-
-  const handleFilterSubmit = async () => {
-    const nextFilters = { ...filters, pagina: 1 };
-    setFilters(nextFilters);
-    await loadVehiculos(nextFilters);
-  };
-
   const changePage = async (nextPage) => {
     const safePage = Math.min(Math.max(nextPage, 1), totalPages);
     const nextFilters = { ...filters, pagina: safePage };
     setFilters(nextFilters);
+    await loadVehiculos(nextFilters);
+  };
+
+  const handleSearchClick = async () => {
+    const nextFilters = { ...filters, pagina: 1 };
+    setFilters(nextFilters);
+
+    const idMarca = Number(nextFilters.idMarca);
+    const idCategoria = Number(nextFilters.idCategoria);
+    const idLocalizacion = Number(nextFilters.idLocalizacion);
+    const hasIdFilters =
+      (Number.isFinite(idMarca) && idMarca > 0) ||
+      (Number.isFinite(idCategoria) && idCategoria > 0) ||
+      (Number.isFinite(idLocalizacion) && idLocalizacion > 0);
+
+    // Fallback robusto: filtra por IDs sobre el listado completo.
+    if (hasIdFilters) {
+      try {
+        setIsLoading(true);
+        setErrorMessage('');
+        const response = await listVehiculos();
+        const allItems = Array.isArray(response?.data) ? response.data.map(normalizeVehiculo) : [];
+        const searchValue = String(nextFilters.valorBusqueda || '').trim().toLowerCase();
+        const searchField = nextFilters.campoBusqueda === 'modelo' ? 'modelo' : 'placa';
+
+        const filtered = allItems.filter((vehiculo) => {
+          const matchesMarca = !idMarca || Number(vehiculo.idMarca) === idMarca;
+          const matchesCategoria = !idCategoria || Number(vehiculo.idCategoria) === idCategoria;
+          const matchesLocalizacion = !idLocalizacion || Number(vehiculo.idLocalizacion) === idLocalizacion;
+          const fieldValue = String(vehiculo?.[searchField] || '').toLowerCase();
+          const matchesText = !searchValue || fieldValue.includes(searchValue);
+          return matchesMarca && matchesCategoria && matchesLocalizacion && matchesText;
+        });
+
+        setVehiculos(filtered);
+        setTotal(filtered.length);
+        setPage(1);
+        setPageSize(filtered.length || 10);
+        setStatusMessage(filtered.length ? 'Busqueda completada.' : 'No se encontraron resultados.');
+        return;
+      } catch (error) {
+        setErrorMessage(error.message || 'No se pudo completar la busqueda por filtros.');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
     await loadVehiculos(nextFilters);
   };
 
@@ -577,7 +556,7 @@ function VehiculosPage({ onBack }) {
             Regresar
           </button>
           <h2>Vehiculos</h2>
-          <p>Administra vehiculos, filtros de disponibilidad y operaciones especiales del inventario.</p>
+          <p>Administra vehiculos con busqueda dinamica y filtros amigables.</p>
         </div>
         <button className={styles.secondaryButton} type="button" onClick={() => loadVehiculos(filters)}>
           Recargar
@@ -598,6 +577,26 @@ function VehiculosPage({ onBack }) {
           </div>
 
           <div className={styles.filterGrid}>
+            <label className={styles.fieldCompact}>
+              <span>Buscar por</span>
+              <select className={styles.select} name="campoBusqueda" value={filters.campoBusqueda} onChange={handleFilterChange}>
+                <option value="placa">Placa</option>
+                <option value="modelo">Modelo</option>
+              </select>
+            </label>
+
+            <label className={styles.fieldCompact}>
+              <span>Valor</span>
+              <input
+                className={styles.input}
+                name="valorBusqueda"
+                type="text"
+                value={filters.valorBusqueda}
+                onChange={handleFilterChange}
+                placeholder={searchPlaceholder}
+              />
+            </label>
+
             <label className={styles.fieldCompact}>
               <span>Marca</span>
               <select className={styles.select} name="idMarca" value={filters.idMarca} onChange={handleFilterChange}>
@@ -635,75 +634,6 @@ function VehiculosPage({ onBack }) {
             </label>
 
             <label className={styles.fieldCompact}>
-              <span>Placa</span>
-              <input className={styles.input} name="placa" type="text" value={filters.placa} onChange={handleFilterChange} />
-            </label>
-
-            <label className={styles.fieldCompact}>
-              <span>Modelo</span>
-              <input className={styles.input} name="modelo" type="text" value={filters.modelo} onChange={handleFilterChange} />
-            </label>
-
-            <label className={styles.fieldCompact}>
-              <span>Estado</span>
-              <input className={styles.input} name="estado" type="text" value={filters.estado} onChange={handleFilterChange} />
-            </label>
-
-            <label className={styles.fieldCompact}>
-              <span>Combustible</span>
-              <select className={styles.select} name="tipoCombustible" value={filters.tipoCombustible} onChange={handleFilterChange}>
-                <option value="">Todos</option>
-                <option value="GASOLINA">Gasolina</option>
-                <option value="DIESEL">Diesel</option>
-                <option value="HIBRIDO">Hibrido</option>
-                <option value="ELECTRICO">Electrico</option>
-              </select>
-            </label>
-
-            <label className={styles.fieldCompact}>
-              <span>Transmision</span>
-              <select className={styles.select} name="tipoTransmision" value={filters.tipoTransmision} onChange={handleFilterChange}>
-                <option value="">Todas</option>
-                <option value="AUTOMATICA">Automatica</option>
-                <option value="MANUAL">Manual</option>
-              </select>
-            </label>
-
-            <label className={styles.fieldCompact}>
-              <span>Pasajeros min.</span>
-              <input className={styles.input} name="capacidadMinPasajeros" type="number" min="1" value={filters.capacidadMinPasajeros} onChange={handleFilterChange} />
-            </label>
-
-            <label className={styles.fieldCompact}>
-              <span>Aire</span>
-              <select className={styles.select} name="aireAcondicionado" value={filters.aireAcondicionado} onChange={handleFilterChange}>
-                <option value="">Todos</option>
-                <option value="true">Si</option>
-                <option value="false">No</option>
-              </select>
-            </label>
-
-            <label className={styles.fieldCompact}>
-              <span>Precio min.</span>
-              <input className={styles.input} name="precioMin" type="number" min="0" step="0.01" value={filters.precioMin} onChange={handleFilterChange} />
-            </label>
-
-            <label className={styles.fieldCompact}>
-              <span>Precio max.</span>
-              <input className={styles.input} name="precioMax" type="number" min="0" step="0.01" value={filters.precioMax} onChange={handleFilterChange} />
-            </label>
-
-            <label className={styles.fieldCompact}>
-              <span>Fecha inicio</span>
-              <input className={styles.input} name="fechaInicio" type="date" value={filters.fechaInicio} onChange={handleFilterChange} />
-            </label>
-
-            <label className={styles.fieldCompact}>
-              <span>Fecha fin</span>
-              <input className={styles.input} name="fechaFin" type="date" value={filters.fechaFin} onChange={handleFilterChange} />
-            </label>
-
-            <label className={styles.fieldCompact}>
               <span>Tamano</span>
               <select className={styles.select} name="tamano" value={filters.tamano} onChange={handleFilterChange}>
                 <option value="5">5</option>
@@ -715,23 +645,8 @@ function VehiculosPage({ onBack }) {
           </div>
 
           <div className={styles.searchRow}>
-            <button className={styles.primaryButton} type="button" onClick={handleFilterSubmit}>
-              Buscar con filtros
-            </button>
-            <button className={styles.secondaryButton} type="button" onClick={handleSearchByPlaca}>
-              Buscar placa
-            </button>
-            <button className={styles.secondaryButton} type="button" onClick={handleSearchByMarca}>
-              Por marca
-            </button>
-            <button className={styles.secondaryButton} type="button" onClick={handleSearchByCategoria}>
-              Por categoria
-            </button>
-            <button className={styles.secondaryButton} type="button" onClick={handleSearchByPrecio}>
-              Por precio
-            </button>
-            <button className={styles.secondaryButton} type="button" onClick={handleSearchDisponibles}>
-              Disponibles
+            <button className={styles.primaryButton} type="button" onClick={handleSearchClick}>
+              Buscar
             </button>
             <button
               className={styles.secondaryButton}
@@ -791,12 +706,6 @@ function VehiculosPage({ onBack }) {
                       <div className={styles.actions}>
                         <button className={styles.linkButton} type="button" onClick={() => handleEdit(vehiculo.id)}>
                           Editar
-                        </button>
-                        <button className={styles.linkButton} type="button" onClick={() => handleUpdateKilometraje(vehiculo)}>
-                          Km
-                        </button>
-                        <button className={styles.linkButton} type="button" onClick={() => handleUpdateEstado(vehiculo)}>
-                          Estado
                         </button>
                         <button className={styles.linkDanger} type="button" onClick={() => handleDelete(vehiculo.id)}>
                           Eliminar
@@ -893,7 +802,13 @@ function VehiculosPage({ onBack }) {
             <div className={styles.twoColumns}>
               <label className={styles.field}>
                 <span>Color</span>
-                <input className={styles.input} name="color" type="text" value={form.color} onChange={handleFormChange} />
+                <select className={styles.select} name="color" value={form.color} onChange={handleFormChange}>
+                  {colorOptions.map((color) => (
+                    <option key={color} value={color}>
+                      {color}
+                    </option>
+                  ))}
+                </select>
               </label>
 
               <label className={styles.field}>
@@ -949,22 +864,32 @@ function VehiculosPage({ onBack }) {
               </label>
             </div>
 
-            <div className={styles.twoColumns}>
-              <label className={styles.field}>
-                <span>Precio base dia</span>
-                <input className={styles.input} name="precioBaseDia" type="number" min="0" step="0.01" value={form.precioBaseDia} onChange={handleFormChange} />
-              </label>
-
-              <label className={styles.field}>
-                <span>Estado</span>
-                <input className={styles.input} name="estado" type="text" value={form.estado} onChange={handleFormChange} disabled={!editingId} />
-              </label>
-            </div>
+            <label className={styles.field}>
+              <span>Precio base dia</span>
+              <input className={styles.input} name="precioBaseDia" type="number" min="0" step="0.01" value={form.precioBaseDia} onChange={handleFormChange} />
+            </label>
 
             <label className={styles.field}>
-              <span>Imagen URL</span>
-              <input className={styles.input} name="imagenUrl" type="text" value={form.imagenUrl} onChange={handleFormChange} />
+              <span>Imagen</span>
+              <input
+                className={styles.input}
+                name="imagenFile"
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+              />
             </label>
+
+            {(imagePreviewUrl || form.imagenUrl) && (
+              <div className={styles.field}>
+                <span>Vista previa</span>
+                <img
+                  src={imagePreviewUrl || form.imagenUrl}
+                  alt="Vista previa vehiculo"
+                  style={{ width: '100%', maxWidth: 280, borderRadius: 10, border: '1px solid #dbe3ee' }}
+                />
+              </div>
+            )}
 
             <label className={styles.field}>
               <span>Observaciones</span>
@@ -972,7 +897,13 @@ function VehiculosPage({ onBack }) {
             </label>
 
             <button className={styles.primaryButton} type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Guardando...' : editingId ? 'Actualizar vehiculo' : 'Crear vehiculo'}
+              {isSubmitting || isUploadingImage
+                ? isUploadingImage
+                  ? 'Subiendo imagen...'
+                  : 'Guardando...'
+                : editingId
+                  ? 'Actualizar vehiculo'
+                  : 'Crear vehiculo'}
             </button>
           </form>
 
@@ -997,6 +928,17 @@ function VehiculosPage({ onBack }) {
               <p>
                 <strong>Kilometraje:</strong> {selectedVehiculo.kilometrajeActual ?? '-'}
               </p>
+              {selectedVehiculo.imagenUrl ? (
+                <p>
+                  <strong>Imagen:</strong>
+                  <br />
+                  <img
+                    src={selectedVehiculo.imagenUrl}
+                    alt={`Vehiculo ${selectedVehiculo.placa || selectedVehiculo.id}`}
+                    style={{ width: '100%', maxWidth: 280, borderRadius: 10, border: '1px solid #dbe3ee' }}
+                  />
+                </p>
+              ) : null}
             </div>
           ) : null}
         </section>

@@ -5,8 +5,6 @@ import {
   existsConductorIdentificacion,
   existsConductorLicencia,
   getConductorById,
-  getConductorByIdentificacion,
-  getConductorByLicencia,
   searchConductores,
   updateConductor,
 } from '../../api/services/api';
@@ -27,12 +25,9 @@ const initialForm = {
 };
 
 const initialFilters = {
-  numeroIdentificacion: '',
-  numeroLicencia: '',
-  nombre: '',
+  campoBusqueda: 'numeroIdentificacion',
+  valorBusqueda: '',
   estado: '',
-  edadMin: '',
-  edadMax: '',
   pagina: 1,
   tamano: 10,
 };
@@ -102,15 +97,15 @@ function extractItem(response) {
 }
 
 function buildPayload(filters) {
+  const searchValue = String(filters.valorBusqueda || '').trim();
+  const searchField = filters.campoBusqueda;
   return {
-    ...(filters.numeroIdentificacion.trim()
-      ? { numeroIdentificacion: filters.numeroIdentificacion.trim() }
+    ...(searchValue && searchField === 'numeroIdentificacion'
+      ? { numeroIdentificacion: searchValue }
       : {}),
-    ...(filters.numeroLicencia.trim() ? { numeroLicencia: filters.numeroLicencia.trim() } : {}),
-    ...(filters.nombre.trim() ? { nombre: filters.nombre.trim() } : {}),
+    ...(searchValue && searchField === 'numeroLicencia' ? { numeroLicencia: searchValue } : {}),
+    ...(searchValue && searchField === 'nombre' ? { nombre: searchValue } : {}),
     ...(filters.estado ? { estado: filters.estado } : {}),
-    ...(filters.edadMin !== '' ? { edadMin: Number(filters.edadMin) } : {}),
-    ...(filters.edadMax !== '' ? { edadMax: Number(filters.edadMax) } : {}),
     pagina: Number(filters.pagina) || 1,
     tamano: Number(filters.tamano) || 10,
   };
@@ -141,9 +136,13 @@ function normalizeIdentificacionByTipo(tipoIdentificacion, identificacion) {
   const tipo = normalizeTipoIdentificacion(tipoIdentificacion);
   const value = String(identificacion || '').trim();
   if (tipo === 'CEDULA' || tipo === 'RUC') {
-    return value.replace(/\D/g, '');
+    const maxLength = tipo === 'CEDULA' ? 10 : 13;
+    return value.replace(/\D/g, '').slice(0, maxLength);
   }
-  return value;
+  if (tipo === 'PASAPORTE') {
+    return value.slice(0, 20);
+  }
+  return value.slice(0, 20);
 }
 
 function normalizeTelefono(value) {
@@ -171,6 +170,11 @@ function ConductoresPage({ onBack }) {
     [editingId]
   );
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize || 1)), [pageSize, total]);
+  const searchPlaceholder = useMemo(() => {
+    if (filters.campoBusqueda === 'numeroLicencia') return 'Buscar por licencia';
+    if (filters.campoBusqueda === 'nombre') return 'Buscar por nombre';
+    return 'Buscar por identificacion';
+  }, [filters.campoBusqueda]);
 
   const loadConductores = async (nextFilters = filters) => {
     try {
@@ -224,6 +228,7 @@ function ConductoresPage({ onBack }) {
     setFilters((currentFilters) => ({
       ...currentFilters,
       [name]: value,
+      ...(name !== 'pagina' ? { pagina: 1 } : {}),
     }));
   };
 
@@ -255,6 +260,13 @@ function ConductoresPage({ onBack }) {
     }
     if (normalizedTipoIdentificacion === 'RUC' && normalizedIdentificacion.length !== 13) {
       setErrorMessage('El RUC debe tener 13 digitos.');
+      return;
+    }
+    if (
+      normalizedTipoIdentificacion === 'PASAPORTE' &&
+      (normalizedIdentificacion.length < 7 || normalizedIdentificacion.length > 20)
+    ) {
+      setErrorMessage('El pasaporte debe tener entre 7 y 20 caracteres.');
       return;
     }
     if (normalizeTelefono(form.telefono).length !== 10) {
@@ -368,38 +380,6 @@ function ConductoresPage({ onBack }) {
     }
   };
 
-  const handleSearchByKey = async (type) => {
-    const value =
-      type === 'identificacion'
-        ? filters.numeroIdentificacion.trim()
-        : filters.numeroLicencia.trim();
-
-    if (!value) {
-      await loadConductores(filters);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setErrorMessage('');
-      const response =
-        type === 'identificacion'
-          ? await getConductorByIdentificacion(value)
-          : await getConductorByLicencia(value);
-      const conductor = extractItem(response);
-      setConductores(conductor ? [conductor] : []);
-      setTotal(conductor ? 1 : 0);
-      setPage(1);
-      setStatusMessage(conductor ? 'Conductor encontrado.' : 'No se encontraron resultados.');
-    } catch (error) {
-      setConductores([]);
-      setTotal(0);
-      setErrorMessage(error.message || 'No se pudo completar la busqueda.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleFilterSubmit = async () => {
     const nextFilters = { ...filters, pagina: 1 };
     setFilters(nextFilters);
@@ -443,34 +423,27 @@ function ConductoresPage({ onBack }) {
 
           <div className={styles.filterGrid}>
             <label className={styles.fieldCompact}>
-              <span>Identificacion</span>
-              <input
-                className={styles.input}
-                name="numeroIdentificacion"
-                type="text"
-                value={filters.numeroIdentificacion}
+              <span>Buscar por</span>
+              <select
+                className={styles.select}
+                name="campoBusqueda"
+                value={filters.campoBusqueda}
                 onChange={handleFilterChange}
-              />
+              >
+                <option value="numeroIdentificacion">Identificacion</option>
+                <option value="numeroLicencia">Licencia</option>
+                <option value="nombre">Nombre</option>
+              </select>
             </label>
 
             <label className={styles.fieldCompact}>
-              <span>Licencia</span>
+              <span>Valor</span>
               <input
                 className={styles.input}
-                name="numeroLicencia"
+                name="valorBusqueda"
                 type="text"
-                value={filters.numeroLicencia}
-                onChange={handleFilterChange}
-              />
-            </label>
-
-            <label className={styles.fieldCompact}>
-              <span>Nombre</span>
-              <input
-                className={styles.input}
-                name="nombre"
-                type="text"
-                value={filters.nombre}
+                value={filters.valorBusqueda}
+                placeholder={searchPlaceholder}
                 onChange={handleFilterChange}
               />
             </label>
@@ -487,30 +460,6 @@ function ConductoresPage({ onBack }) {
                 <option value="ACT">Activo</option>
                 <option value="INA">Inactivo</option>
               </select>
-            </label>
-
-            <label className={styles.fieldCompact}>
-              <span>Edad minima</span>
-              <input
-                className={styles.input}
-                name="edadMin"
-                type="number"
-                min="0"
-                value={filters.edadMin}
-                onChange={handleFilterChange}
-              />
-            </label>
-
-            <label className={styles.fieldCompact}>
-              <span>Edad maxima</span>
-              <input
-                className={styles.input}
-                name="edadMax"
-                type="number"
-                min="0"
-                value={filters.edadMax}
-                onChange={handleFilterChange}
-              />
             </label>
 
             <label className={styles.fieldCompact}>
@@ -531,21 +480,7 @@ function ConductoresPage({ onBack }) {
 
           <div className={styles.searchRow}>
             <button className={styles.primaryButton} type="button" onClick={handleFilterSubmit}>
-              Buscar con filtros
-            </button>
-            <button
-              className={styles.secondaryButton}
-              type="button"
-              onClick={() => handleSearchByKey('identificacion')}
-            >
-              Buscar identificacion
-            </button>
-            <button
-              className={styles.secondaryButton}
-              type="button"
-              onClick={() => handleSearchByKey('licencia')}
-            >
-              Buscar licencia
+              Buscar
             </button>
             <button
               className={styles.secondaryButton}
@@ -735,6 +670,13 @@ function ConductoresPage({ onBack }) {
                   type="text"
                   value={form.numeroIdentificacion}
                   onChange={handleFormChange}
+                  maxLength={
+                    form.tipoIdentificacion === 'CEDULA'
+                      ? 10
+                      : form.tipoIdentificacion === 'RUC'
+                        ? 13
+                        : 20
+                  }
                 />
               </label>
             </div>
