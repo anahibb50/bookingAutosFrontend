@@ -96,9 +96,11 @@ async function parseJsonResponse(response) {
 
 function buildHeaders(extraHeaders = {}) {
   const token = getAuthToken();
+  const apiVersion = process.env.REACT_APP_API_VERSION;
 
   return {
     Accept: 'application/json',
+    ...(apiVersion ? { 'X-Version': apiVersion } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...extraHeaders,
   };

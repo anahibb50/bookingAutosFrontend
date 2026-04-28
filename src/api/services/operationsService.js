@@ -148,6 +148,10 @@ export async function getReservasByCliente(idCliente) {
   return api.get(`/reservas/por-cliente/${idCliente}`);
 }
 
+export async function getMisReservasCliente() {
+  return api.get('/reservas/mis-reservas');
+}
+
 export async function getReservasByVehiculo(idVehiculo) {
   return api.get(`/reservas/por-vehiculo/${idVehiculo}`);
 }
@@ -164,6 +168,16 @@ export async function verifyDisponibilidadReserva(idVehiculo, fechaInicio, fecha
 
 export async function createReserva(payload) {
   return api.post('/reservas', payload);
+}
+
+/** Cliente público — permite sobreescribir ruta (`REACT_APP_RESERVA_CREAR_PATH`) si difiere del backoffice */
+export async function crearReservaCliente(payload) {
+  const path =
+    typeof process.env.REACT_APP_RESERVA_CREAR_PATH === 'string' &&
+    process.env.REACT_APP_RESERVA_CREAR_PATH.trim().length > 0
+      ? process.env.REACT_APP_RESERVA_CREAR_PATH.trim()
+      : '/reservas/crear-y-confirmar';
+  return api.post(path, payload);
 }
 
 export async function updateReserva(id, payload) {

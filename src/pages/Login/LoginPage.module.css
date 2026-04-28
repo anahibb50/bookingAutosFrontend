@@ -18,6 +18,38 @@
   box-shadow: 0 12px 28px rgba(26, 43, 74, 0.08);
 }
 
+.wideCard {
+  width: min(100%, 560px);
+}
+
+.formRowTwo {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 520px) {
+  .formRowTwo {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.secondaryLink {
+  margin: 0;
+  text-align: center;
+  font-size: 0.92rem;
+  color: #5a6a80;
+}
+
+.secondaryLink a {
+  color: #1a2b4a;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.secondaryLink a:hover {
+  text-decoration: underline;
+}
+
 .backButton {
   margin-bottom: 14px;
   border: 1px solid #d3dce8;

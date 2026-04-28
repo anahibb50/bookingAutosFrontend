@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { getStoredSession, loginRequest } from '../../api/services/api';
+import { Link, useLocation } from 'react-router-dom';
+import { getStoredSession, loginRequest, sessionHasRole } from '../../api/services/api';
 import styles from './LoginPage.module.css';
 
 const initialForm = {
@@ -8,6 +9,7 @@ const initialForm = {
 };
 
 function LoginPage({ onLoginSuccess, onBack }) {
+  const location = useLocation();
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const [statusMessage, setStatusMessage] = useState('');
@@ -37,7 +39,7 @@ function LoginPage({ onLoginSuccess, onBack }) {
     }
 
     if (!form.password.trim()) {
-      nextErrors.password = 'Ingresa tu contrasena.';
+      nextErrors.password = 'Ingresa tu contraseña.';
     }
 
     return nextErrors;
@@ -61,7 +63,7 @@ function LoginPage({ onLoginSuccess, onBack }) {
 
       await loginRequest({
         username: form.username.trim(),
-        password: form.password,
+        password: form.password.trim(),
       });
 
       const session = getStoredSession();
@@ -71,7 +73,13 @@ function LoginPage({ onLoginSuccess, onBack }) {
       }
 
       setStatusMessage('Acceso concedido.');
-      onLoginSuccess?.(session);
+      const rq = location.state?.reservaQuery;
+      const pathQuery = rq && String(rq).trim() ? `?${String(rq).trim()}` : '';
+      const redirectReserva =
+        location.state?.vehiculoId && sessionHasRole('CLIENTE', session)
+          ? `/reserva/${location.state.vehiculoId}${pathQuery}`
+          : undefined;
+      onLoginSuccess?.(session, redirectReserva);
     } catch (error) {
       setStatusMessage(error.message || 'No se pudo iniciar sesion.');
     } finally {
@@ -90,16 +98,13 @@ function LoginPage({ onLoginSuccess, onBack }) {
         <div className={styles.brandBlock}>
           <div className={styles.logoBadge}>R</div>
           <div>
-            <p className={styles.kicker}>Backoffice administrativo</p>
-            <h1 className={styles.title}>Budget Car</h1>
+            <p className={styles.kicker}>Budget Car</p>
+            <h1 className={styles.title}>Acceso a la plataforma</h1>
           </div>
         </div>
 
         <div className={styles.welcomeBlock}>
-          <h2 className={styles.heading}>Iniciar sesion</h2>
-          <p className={styles.subtitle}>
-            Ingresa tu usuario y contrasena para acceder al sistema.
-          </p>
+          <h2 className={styles.heading}>Iniciar sesión</h2>
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit} noValidate>
@@ -125,14 +130,14 @@ function LoginPage({ onLoginSuccess, onBack }) {
 
           <div className={styles.fieldGroup}>
             <label className={styles.label} htmlFor="password">
-              Contrasena
+              Contraseña
             </label>
             <input
               id="password"
               name="password"
               type="password"
               className={`${styles.input} ${errors.password ? styles.inputError : ''}`}
-              placeholder="Ingresa tu contrasena"
+              placeholder="Ingresa tu contraseña"
               value={form.password}
               onChange={handleChange}
               autoComplete="current-password"
@@ -154,8 +159,12 @@ function LoginPage({ onLoginSuccess, onBack }) {
           ) : null}
 
           <button className={styles.submitButton} type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Ingresando...' : 'Iniciar sesion'}
+            {isSubmitting ? 'Ingresando...' : 'Iniciar sesión'}
           </button>
+
+          <p className={styles.secondaryLink}>
+            <Link to="/registro">Crear cuenta</Link>
+          </p>
         </form>
       </div>
     </section>

@@ -52,6 +52,38 @@
   color: #fff;
 }
 
+.navAuth {
+  margin-top: 0.5rem;
+}
+
+@media (min-width: 992px) {
+  .navAuth {
+    margin-top: 0;
+  }
+}
+
+.sessionLabel {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.85rem;
+  font-weight: 600;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navGhostBtn {
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #fff;
+  font-weight: 600;
+}
+
+.navGhostBtn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: #fff;
+  color: #fff;
+}
+
 .hero {
   background:
     linear-gradient(rgba(13, 27, 62, 0.7), rgba(13, 27, 62, 0.7)),

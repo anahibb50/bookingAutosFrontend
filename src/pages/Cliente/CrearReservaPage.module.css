@@ -1,0 +1,413 @@
+.page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f4f6fa 0%, #eef2f8 45%, #e8eef6 100%);
+  color: #0d1b3e;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+.shell {
+  padding: 1rem 0 3rem;
+}
+
+.heroBar {
+  background: #0d1b3e;
+  color: #fff;
+  padding: 0.85rem 0;
+}
+
+.heroInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.brandBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.brandLogo {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+}
+
+.logoutBtn {
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: transparent;
+  color: #fff;
+  border-radius: 8px;
+  padding: 0.35rem 0.75rem;
+  font-weight: 600;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(260px, 2fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 991px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #e2e8f5;
+  box-shadow: 0 12px 32px rgba(13, 27, 62, 0.06);
+  padding: 1.25rem 1.35rem;
+  margin-bottom: 1rem;
+}
+
+.sectionTitle {
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5c6b86;
+  margin: 0 0 1rem;
+}
+
+.carRow {
+  display: flex;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.carImg {
+  width: 168px;
+  min-height: 100px;
+  object-fit: cover;
+  border-radius: 12px;
+  background: #e8eef6;
+}
+
+.carMeta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.carName {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0d1b3e;
+}
+
+.carSub {
+  margin: 0;
+  font-size: 0.94rem;
+  color: #5c6b86;
+}
+
+.formGrid {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.twoCol {
+  display: grid;
+  gap: 0.85rem;
+}
+
+@media (min-width: 576px) {
+  .twoCol {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #30405f;
+  margin-bottom: 0.35rem;
+}
+
+.input,
+.select {
+  width: 100%;
+  border: 1px solid #cfd8e9;
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.96rem;
+}
+
+.inputError {
+  border-color: #d94b57 !important;
+}
+
+.errorText {
+  color: #b8323e;
+  font-size: 0.82rem;
+  margin-top: 0.2rem;
+  display: block;
+}
+
+.badgeDays {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #e8f3ff;
+  color: #0d47a1;
+  font-weight: 800;
+  font-size: 0.88rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  margin-top: 0.35rem;
+  width: fit-content;
+}
+
+.extrasGrid {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.extraCard {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  border: 1px solid #e2e8f5;
+  border-radius: 12px;
+  padding: 0.85rem;
+  background: #fbfcfe;
+}
+
+.extraInfo h4 {
+  margin: 0 0 0.2rem;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #0d1b3e;
+}
+
+.extraInfo p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #5c6b86;
+  line-height: 1.4;
+}
+
+.counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.counterBtn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid #cfd8e9;
+  background: #fff;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.counterVal {
+  min-width: 1.75rem;
+  text-align: center;
+  font-weight: 800;
+}
+
+.conductorCard {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.65rem;
+  border: 1px solid #d8f0dc;
+  background: #f4fbf5;
+  border-radius: 12px;
+  padding: 0.85rem;
+}
+
+.tagTitular {
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #1b5e20;
+  letter-spacing: 0.04em;
+}
+
+.searchRow {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+@media (min-width: 576px) {
+  .searchRow {
+    grid-template-columns: 1fr auto auto;
+    align-items: end;
+  }
+}
+
+.textarea {
+  width: 100%;
+  border: 1px solid #cfd8e9;
+  border-radius: 10px;
+  padding: 0.65rem;
+  font-size: 0.94rem;
+  min-height: 88px;
+  resize: vertical;
+}
+
+.ctaLarge {
+  width: 100%;
+  margin-top: 0.65rem;
+  padding: 0.95rem;
+  border: 0;
+  border-radius: 12px;
+  background: #e63946;
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ctaLarge:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.sidebar {
+  position: sticky;
+  top: 16px;
+}
+
+.summaryCard {
+  background: linear-gradient(145deg, #ffffff 0%, #f3f7ff 100%);
+}
+
+.summaryDivider {
+  height: 1px;
+  background: #dde5f5;
+  margin: 0.75rem 0;
+}
+
+.costLine {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #374c6d;
+}
+
+.costLineTotal {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #0d1b3e;
+}
+
+.totalHuge {
+  font-size: 1.55rem;
+  color: #e63946;
+}
+
+.conductorList {
+  display: grid;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(13, 27, 62, 0.45);
+  z-index: 1050;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.modalInner {
+  background: #fff;
+  border-radius: 14px;
+  max-width: 520px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+  padding: 1.35rem;
+  box-shadow: 0 20px 48px rgba(13, 27, 62, 0.2);
+}
+
+.modalActions {
+  display: flex;
+  gap: 0.65rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.btnGhost {
+  border: 1px solid #cfd8e9;
+  background: #fff;
+  border-radius: 10px;
+  padding: 0.55rem 1rem;
+  font-weight: 700;
+}
+
+.btnGhost:disabled {
+  opacity: 0.55;
+}
+
+.successPanel {
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.successBadge {
+  display: inline-block;
+  width: 72px;
+  height: 72px;
+  line-height: 72px;
+  border-radius: 50%;
+  background: #d8f5dd;
+  color: #1b5e20;
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.spinner {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  border: 3px solid #e2e8f5;
+  border-top-color: #e63946;
+  animation: rrspin 0.75s linear infinite;
+}
+
+@keyframes rrspin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.inlineSpinner {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 0.35rem;
+}
+
+.loadingBlock {
+  display: grid;
+  place-items: center;
+  min-height: 40vh;
+}

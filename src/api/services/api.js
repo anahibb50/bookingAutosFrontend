@@ -1,9 +1,13 @@
 export {
   clearSession,
+  getSessionIdCliente,
   getSessionRoles,
   getStoredSession,
+  hydrateSessionIdClienteFromApi,
   loginRequest,
+  registerRequest,
   sessionHasRole,
+  sessionIsStaff,
 } from './authService';
 
 export {
@@ -63,6 +67,7 @@ export {
   createConductor,
   createFactura,
   createReserva,
+  crearReservaCliente,
   createVehiculo,
   deleteCliente,
   deleteConductor,
@@ -79,6 +84,7 @@ export {
   getFacturaById,
   getFacturaByReserva,
   getFacturasByCliente,
+  getMisReservasCliente,
   getReservaById,
   getReservasByCliente,
   getReservasByVehiculo,

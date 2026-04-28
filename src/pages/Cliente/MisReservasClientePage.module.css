@@ -1,0 +1,235 @@
+.pageHeader {
+  border-bottom: 3px solid #ff6b00;
+  padding-bottom: 0.55rem;
+  margin-bottom: 1rem;
+}
+
+.title {
+  margin: 0;
+  color: #1b2a4a;
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.subtitle {
+  margin: 0.25rem 0 0;
+  color: #6c757d;
+  font-size: 0.95rem;
+}
+
+.successBanner {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  border-left: 5px solid #28a745;
+  background: #d4edda;
+  color: #155724;
+  border-radius: 10px;
+  padding: 0.8rem 0.95rem;
+  margin-bottom: 1rem;
+  animation: fadeout 5s forwards;
+}
+
+.successIcon {
+  font-size: 1.35rem;
+}
+
+@keyframes fadeout {
+  0% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.cardsWrap {
+  display: grid;
+  gap: 16px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.resCard {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 24px;
+  transition: box-shadow 0.2s ease;
+}
+
+.resCard:hover {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+.cardHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.carTitle {
+  margin: 0;
+  color: #1b2a4a;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.codeText {
+  margin: 0.25rem 0 0;
+  color: #6c757d;
+  font-size: 0.82rem;
+}
+
+.statusBadge {
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.badgeCon {
+  color: #1f6f34;
+  background: #d4edda;
+}
+
+.badgeCan {
+  color: #842029;
+  background: #f8d7da;
+}
+
+.badgePen {
+  color: #7a5b00;
+  background: #fff3cd;
+}
+
+.cardGrid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sectionLabel {
+  color: #1b2a4a;
+  font-size: 0.88rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.sectionValue {
+  margin: 0;
+  color: #26354f;
+  font-size: 0.9rem;
+}
+
+.badgesWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.driverBadge {
+  background: #eef2f7;
+  color: #24354d;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.78rem;
+}
+
+.rolePri {
+  color: #1b4e93;
+  font-weight: 800;
+}
+
+.roleSec {
+  color: #6c757d;
+  font-weight: 700;
+}
+
+.emptyText {
+  margin: 0;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.listStack {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.cardFoot {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid #e7ecf3;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.moneyLabel {
+  display: block;
+  color: #6c757d;
+  font-size: 0.78rem;
+  margin-bottom: 0.1rem;
+}
+
+.totalValue {
+  color: #ff6b00;
+  font-size: 1.15rem;
+  font-weight: 900;
+}
+
+.emptyState {
+  max-width: 900px;
+  margin: 1rem auto 0;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.emptyIcon {
+  font-size: 2rem;
+  margin-bottom: 0.4rem;
+}
+
+.emptyState h2 {
+  color: #1b2a4a;
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.emptyState p {
+  margin: 0.45rem 0 1rem;
+  color: #6c757d;
+}
+
+.emptyBtn {
+  border: 0;
+  border-radius: 10px;
+  background: #ff6b00;
+  color: #fff;
+  padding: 0.65rem 1.1rem;
+  font-weight: 700;
+}
+
+@media (max-width: 991px) {
+  .cardsWrap {
+    max-width: 100%;
+  }
+
+  .cardGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .cardFoot {
+    grid-template-columns: 1fr;
+  }
+}

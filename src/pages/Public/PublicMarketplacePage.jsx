@@ -5,19 +5,12 @@ import {
   listCategorias,
   listCiudades,
   listLocalizaciones,
+  sessionHasRole,
   verifyDisponibilidadReserva,
 } from '../../api/services/api';
 import styles from './PublicMarketplacePage.module.css';
 
 const initialSearch = { idLocalizacionRecogida: '', fechaRecogida: '', horaRecogida: '09:00' };
-const initialModal = {
-  idLocalizacionRecogida: '',
-  idLocalizacionEntrega: '',
-  fechaRecogida: '',
-  horaRecogida: '09:00',
-  fechaDevolucion: '',
-  horaDevolucion: '18:00',
-};
 
 const hourOptions = Array.from({ length: 14 }).map((_, index) =>
   `${String(index + 8).padStart(2, '0')}:00`
@@ -90,7 +83,18 @@ function toDateTime(dateValue, timeValue) {
   return `${dateValue}T${timeValue}:00`;
 }
 
-function PublicMarketplacePage() {
+/** Query para /reserva (localizacion del vehiculo y categoria) — sobrevive al redirect de login. */
+function buildReservaQuery(vehiculo, nombreCategoria) {
+  const p = new URLSearchParams();
+  if (nombreCategoria) p.set('categoria', nombreCategoria);
+  const idLoc = vehiculo?.idLocalizacion ?? vehiculo?.IdLocalizacion;
+  if (idLoc !== undefined && idLoc !== null && String(idLoc).trim() !== '') {
+    p.set('idLoc', String(idLoc));
+  }
+  return p.toString();
+}
+
+function PublicMarketplacePage({ session = null, onLogout }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [search, setSearch] = useState(initialSearch);
@@ -103,12 +107,9 @@ function PublicMarketplacePage() {
   const [searchError, setSearchError] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
-  const [selectedVehiculo, setSelectedVehiculo] = useState(null);
-  const [modalForm, setModalForm] = useState(initialModal);
-  const [modalErrors, setModalErrors] = useState({});
-  const [modalMessage, setModalMessage] = useState('');
 
   const currentPath = location.pathname;
+  const isClienteLogged = Boolean(session?.token && sessionHasRole('CLIENTE', session));
   const categoriaQuery = useMemo(
     () => new URLSearchParams(location.search).get('categoria')?.toLowerCase() || '',
     [location.search]
@@ -214,22 +215,21 @@ function PublicMarketplacePage() {
     }
   };
 
-  const openReservaModal = (vehiculo) => {
-    setSelectedVehiculo(vehiculo);
-    setModalMessage('');
-    setModalErrors({});
-    setModalForm({
-      ...initialModal,
-      idLocalizacionRecogida: search.idLocalizacionRecogida || '',
-      idLocalizacionEntrega: search.idLocalizacionRecogida || '',
-      fechaRecogida: search.fechaRecogida || '',
+  const irACrearReserva = (vehiculo) => {
+    const nombreCat = categoryMap[String(vehiculo.idCategoria)] || '';
+    const rq = buildReservaQuery(vehiculo, nombreCat);
+    const pathQuery = rq ? `?${rq}` : '';
+    if (!session?.token) {
+      navigate('/admin/login', { state: { vehiculoId: vehiculo.id, reservaQuery: rq } });
+      return;
+    }
+    if (!sessionHasRole('CLIENTE', session)) {
+      navigate('/admin');
+      return;
+    }
+    navigate(`/reserva/${vehiculo.id}${pathQuery}`, {
+      state: { vehiculo },
     });
-  };
-
-  const closeModal = () => {
-    setSelectedVehiculo(null);
-    setModalMessage('');
-    setModalErrors({});
   };
 
   const handleCategoryClick = (categoryName) => {
@@ -344,7 +344,7 @@ function PublicMarketplacePage() {
                     </p>
                         <div className={styles.cardFooter}>
                       <strong className={styles.cardPrice}>${vehiculo.precioPorDia.toFixed(2)} / dia</strong>
-                          <button className={`btn ${styles.searchButton}`} type="button" onClick={() => openReservaModal(vehiculo)}>Reservar ahora</button>
+                          <button className={`btn ${styles.searchButton}`} type="button" onClick={() => irACrearReserva(vehiculo)}>Reservar ahora</button>
                         </div>
                       </div>
                     </article>
@@ -380,7 +380,7 @@ function PublicMarketplacePage() {
                   </p>
                   <div className={styles.cardFooter}>
                     <strong className={styles.cardPrice}>${vehiculo.precioPorDia.toFixed(2)} / dia</strong>
-                    <button className={`btn ${styles.searchButton}`} type="button" onClick={() => openReservaModal(vehiculo)}>Reservar ahora</button>
+                    <button className={`btn ${styles.searchButton}`} type="button" onClick={() => irACrearReserva(vehiculo)}>Reservar ahora</button>
                   </div>
                 </div>
               </article>
@@ -452,10 +452,43 @@ function PublicMarketplacePage() {
             <ul className="navbar-nav me-auto mb-2 mb-lg-0">
               <li className="nav-item"><NavLink to="/" className={({ isActive }) => `nav-link ${isActive ? styles.activeNavLink : ''}`} end>Inicio</NavLink></li>
               <li className="nav-item"><NavLink to="/vehiculos" className={({ isActive }) => `nav-link ${isActive ? styles.activeNavLink : ''}`}>Vehiculos</NavLink></li>
-              <li className="nav-item"><NavLink to="/localidades" className={({ isActive }) => `nav-link ${isActive ? styles.activeNavLink : ''}`}>Localidades</NavLink></li>
-              <li className="nav-item"><NavLink to="/acerca" className={({ isActive }) => `nav-link ${isActive ? styles.activeNavLink : ''}`}>Acerca de nosotros</NavLink></li>
+              {isClienteLogged ? (
+                <li className="nav-item">
+                  <NavLink to="/mis-reservas" className={({ isActive }) => `nav-link ${isActive ? styles.activeNavLink : ''}`}>
+                    Reservas
+                  </NavLink>
+                </li>
+              ) : (
+                <>
+                  <li className="nav-item"><NavLink to="/localidades" className={({ isActive }) => `nav-link ${isActive ? styles.activeNavLink : ''}`}>Localidades</NavLink></li>
+                  <li className="nav-item"><NavLink to="/acerca" className={({ isActive }) => `nav-link ${isActive ? styles.activeNavLink : ''}`}>Acerca de nosotros</NavLink></li>
+                </>
+              )}
             </ul>
-            <button className={`btn ${styles.adminButton}`} type="button" onClick={() => navigate('/admin/login')}>Acceso admin</button>
+            <div className={`d-flex flex-wrap gap-2 align-items-center justify-content-lg-end ${styles.navAuth}`}>
+              {session?.token ? (
+                <>
+                  <span className={styles.sessionLabel}>
+                    {session?.usuario?.username || session?.usuario?.correo || 'Sesion activa'}
+                  </span>
+                  <button
+                    className={`btn btn-outline-light btn-sm ${styles.navGhostBtn}`}
+                    type="button"
+                    onClick={() => onLogout?.()}
+                  >
+                    Salir
+                  </button>
+                </>
+              ) : (
+                <button
+                  className={`btn ${styles.adminButton}`}
+                  type="button"
+                  onClick={() => navigate('/admin/login')}
+                >
+                  Iniciar sesión
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </nav>
@@ -464,64 +497,6 @@ function PublicMarketplacePage() {
       {currentPath === '/vehiculos' ? renderVehiculos() : null}
       {currentPath === '/localidades' ? renderLocalidades() : null}
       {currentPath === '/acerca' ? renderAcerca() : null}
-
-      {selectedVehiculo ? (
-        <div className="modal fade show d-block" tabIndex="-1" role="dialog" aria-modal="true" onClick={closeModal}>
-          <div className="modal-dialog modal-lg modal-dialog-centered" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Reservar {selectedVehiculo.modelo}</h5>
-                <button type="button" className="btn-close" onClick={closeModal} />
-              </div>
-              <div className="modal-body">
-                <div className="row g-3">
-                  <div className="col-12 col-md-4">
-                    <img src={selectedVehiculo.imagenUrl || 'https://via.placeholder.com/400x220?text=Vehiculo'} alt={selectedVehiculo.modelo} className="img-fluid rounded" />
-                  </div>
-                  <div className="col-12 col-md-8">
-                    <p className="mb-1"><strong>Categoria:</strong> {categoryMap[String(selectedVehiculo.idCategoria)] || 'General'}</p>
-                    <p className="mb-1"><strong>Precio base:</strong> ${selectedVehiculo.precioPorDia.toFixed(2)} / dia</p>
-                  </div>
-                  <div className="col-12 col-md-6">
-                    <label className="form-label">Localidad de recogida</label>
-                    <select className="form-select" value={modalForm.idLocalizacionRecogida} onChange={(e) => setModalForm((c) => ({ ...c, idLocalizacionRecogida: e.target.value }))}>
-                      <option value="">Selecciona</option>
-                      {localizaciones.map((loc) => <option key={loc.id} value={loc.id}>{loc.nombre}</option>)}
-                    </select>
-                    {modalErrors.idLocalizacionRecogida ? <small className="text-danger">{modalErrors.idLocalizacionRecogida}</small> : null}
-                  </div>
-                  <div className="col-12 col-md-6">
-                    <label className="form-label">Localidad de devolucion</label>
-                    <select className="form-select" value={modalForm.idLocalizacionEntrega} onChange={(e) => setModalForm((c) => ({ ...c, idLocalizacionEntrega: e.target.value }))}>
-                      <option value="">Selecciona</option>
-                      {localizaciones.map((loc) => <option key={loc.id} value={loc.id}>{loc.nombre}</option>)}
-                    </select>
-                    {modalErrors.idLocalizacionEntrega ? <small className="text-danger">{modalErrors.idLocalizacionEntrega}</small> : null}
-                  </div>
-                </div>
-                {modalMessage ? <div className="alert alert-info mt-3 mb-0">{modalMessage}</div> : null}
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={closeModal}>Cerrar</button>
-                <button
-                  type="button"
-                  className={`btn ${styles.searchButton}`}
-                  onClick={() => {
-                    const errors = {};
-                    if (!modalForm.idLocalizacionRecogida) errors.idLocalizacionRecogida = 'Selecciona la recogida.';
-                    if (!modalForm.idLocalizacionEntrega) errors.idLocalizacionEntrega = 'Selecciona la devolucion.';
-                    setModalErrors(errors);
-                    if (!Object.keys(errors).length) setModalMessage('Reserva enviada correctamente.');
-                  }}
-                >
-                  Confirmar reserva
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="modal-backdrop fade show" />
-        </div>
-      ) : null}
 
       <footer className={styles.footer}>
         <div className="container d-flex flex-column flex-md-row justify-content-between gap-2">
