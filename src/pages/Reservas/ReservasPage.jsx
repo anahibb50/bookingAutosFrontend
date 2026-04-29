@@ -446,7 +446,7 @@ function ReservasPage({ onBack }) {
       );
       return {
         ...nextForm,
-        cantidadDias: dias > 0 ? String(dias) : '',
+        cantidadDias: String(dias),
       };
     });
   };
@@ -606,7 +606,7 @@ function ReservasPage({ onBack }) {
           const hi = String(reserva.horaInicio || '').slice(0, 5);
           const hf = String(reserva.horaFin || '').slice(0, 5);
           const d = calcularCantidadDias(fi, hi, ff, hf);
-          return d > 0 ? String(d) : '';
+          return String(d);
         })(),
         descripcion: reserva.descripcion || '',
         extras: Array.isArray(reserva.extras)
@@ -814,6 +814,19 @@ function ReservasPage({ onBack }) {
     setFilters(nextFilters);
     await loadReservas(nextFilters);
   };
+
+  useEffect(() => {
+    const dias = calcularCantidadDias(form.fechaInicio, form.horaInicio, form.fechaFin, form.horaFin);
+    const diasText = String(dias);
+    if (form.cantidadDias !== diasText) {
+      setForm((currentForm) => ({
+        ...currentForm,
+        cantidadDias: diasText,
+      }));
+    }
+    // Solo depende de los campos que afectan al cálculo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.fechaInicio, form.horaInicio, form.fechaFin, form.horaFin]);
 
   const changePage = async (nextPage) => {
     const safePage = Math.min(Math.max(nextPage, 1), totalPages);
