@@ -237,6 +237,18 @@ function buildDateTimeForAvailability(dateValue, timeValue, isEnd) {
   return `${dateValue}T${normalizedTime}:00`;
 }
 
+function calcularCantidadDias(fechaInicio, horaInicio, fechaFin, horaFin) {
+  if (!fechaInicio || !fechaFin) return 0;
+  const hi = horaInicio || '00:00';
+  const hf = horaFin || '00:00';
+  const inicio = new Date(`${fechaInicio}T${hi}:00`);
+  const fin = new Date(`${fechaFin}T${hf}:00`);
+  const diffMs = fin.getTime() - inicio.getTime();
+  if (diffMs <= 0) return 0;
+  const horas = diffMs / (1000 * 60 * 60);
+  return Math.ceil(horas / 24);
+}
+
 function normalizeRolConductor(value) {
   const normalized = String(value || '').trim().toUpperCase();
   if (normalized === 'TITULAR' || normalized === 'PRINCIPAL' || normalized === 'PRI') {
@@ -421,10 +433,22 @@ function ReservasPage({ onBack }) {
       return;
     }
 
-    setForm((currentForm) => ({
-      ...currentForm,
-      [name]: value,
-    }));
+    setForm((currentForm) => {
+      const nextForm = {
+        ...currentForm,
+        [name]: value,
+      };
+      const dias = calcularCantidadDias(
+        nextForm.fechaInicio,
+        nextForm.horaInicio,
+        nextForm.fechaFin,
+        nextForm.horaFin
+      );
+      return {
+        ...nextForm,
+        cantidadDias: dias > 0 ? String(dias) : '',
+      };
+    });
   };
 
   const handleFilterChange = (event) => {
@@ -572,11 +596,18 @@ function ReservasPage({ onBack }) {
         idVehiculo: reserva.idVehiculo ? String(reserva.idVehiculo) : '',
         idLocalizacionRecogida: reserva.idLocalizacionRecogida ? String(reserva.idLocalizacionRecogida) : '',
         idLocalizacionEntrega: reserva.idLocalizacionEntrega ? String(reserva.idLocalizacionEntrega) : '',
-        cantidadDias: reserva.cantidadDias ? String(reserva.cantidadDias) : '',
         fechaInicio: String(reserva.fechaInicio || '').slice(0, 10),
         fechaFin: String(reserva.fechaFin || '').slice(0, 10),
         horaInicio: String(reserva.horaInicio || '').slice(0, 5),
         horaFin: String(reserva.horaFin || '').slice(0, 5),
+        cantidadDias: (() => {
+          const fi = String(reserva.fechaInicio || '').slice(0, 10);
+          const ff = String(reserva.fechaFin || '').slice(0, 10);
+          const hi = String(reserva.horaInicio || '').slice(0, 5);
+          const hf = String(reserva.horaFin || '').slice(0, 5);
+          const d = calcularCantidadDias(fi, hi, ff, hf);
+          return d > 0 ? String(d) : '';
+        })(),
         descripcion: reserva.descripcion || '',
         extras: Array.isArray(reserva.extras)
           ? reserva.extras.map((extra) => ({
@@ -1028,7 +1059,14 @@ function ReservasPage({ onBack }) {
 
               <label className={styles.field}>
                 <span>Cantidad de dias</span>
-                <input className={styles.input} name="cantidadDias" type="number" min="1" value={form.cantidadDias} onChange={handleFormChange} />
+                <input
+                  className={styles.input}
+                  name="cantidadDias"
+                  type="number"
+                  min="1"
+                  value={form.cantidadDias}
+                  readOnly
+                />
               </label>
             </div>
 

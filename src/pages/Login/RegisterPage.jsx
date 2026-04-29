@@ -86,7 +86,7 @@ function RegisterPage({ onRegisterSuccess, onBack }) {
     const { name, value } = event.target;
 
     if (name === 'telefono') {
-      const digits = value.replace(/\D/g, '').slice(0, 15);
+      const digits = value.replace(/\D/g, '').slice(0, 10);
       setForm((c) => ({ ...c, telefono: digits }));
       setErrors((c) => ({ ...c, telefono: '' }));
       setStatusMessage('');
@@ -141,8 +141,8 @@ function RegisterPage({ onRegisterSuccess, onBack }) {
     if (!form.apellido.trim()) next.apellido = 'Ingresa tu apellido.';
     if (!form.idCiudad) next.idCiudad = 'Selecciona tu ciudad.';
 
-    if (form.telefono && form.telefono.length > 15) {
-      next.telefono = 'Telefono: maximo 15 digitos.';
+    if (form.telefono && form.telefono.length > 10) {
+      next.telefono = 'Telefono: maximo 10 digitos.';
     }
 
     return next;
@@ -162,7 +162,7 @@ function RegisterPage({ onRegisterSuccess, onBack }) {
       setErrors({});
       setStatusMessage('Creando tu cuenta...');
 
-      const telefonoDigits = form.telefono.replace(/\D/g, '').slice(0, 15);
+      const telefonoDigits = form.telefono.replace(/\D/g, '').slice(0, 10);
       const payload = {
         username: form.username.trim(),
         correo: form.correo.trim(),
@@ -383,6 +383,7 @@ function RegisterPage({ onRegisterSuccess, onBack }) {
                 type="tel"
                 inputMode="numeric"
                 pattern="[0-9]*"
+                maxLength={10}
                 className={`${styles.input} ${errors.telefono ? styles.inputError : ''}`}
                 placeholder="Solo numeros"
                 value={form.telefono}
